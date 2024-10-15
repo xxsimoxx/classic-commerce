@@ -16,7 +16,7 @@ class WC_Tests_Product_CSV_Importer extends WC_Unit_Test_Case {
 	/**
 	 * Load up the importer classes since they aren't loaded by default.
 	 */
-	public function setUp() {
+	public function setUp(): void {
 		parent::setUp();
 
 		// Callback used by WP_HTTP_TestCase to decide whether to perform HTTP requests or to provide a mocked response.

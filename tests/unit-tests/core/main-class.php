@@ -19,7 +19,7 @@ class WC_Test_WooCommerce extends WC_Unit_Test_Case {
 	 *
 	 * @since WC-2.2
 	 */
-	public function setUp() {
+	public function setUp(): void {
 		parent::setUp();
 		$this->wc = WC();
 	}
@@ -75,7 +75,7 @@ class WC_Test_WooCommerce extends WC_Unit_Test_Case {
 		$this->assertInstanceOf( 'WC_Payment_Gateways', $this->wc->payment_gateways() );
 		$this->assertInstanceOf( 'WC_Checkout', $this->wc->checkout() );
 	}
-	
+
 	/**
 	 * Test: user_agent_header
 	 */

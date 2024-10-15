@@ -27,7 +27,7 @@ class WC_Tests_Totals extends WC_Unit_Test_Case {
 	/**
 	 * Setup the cart for totals calculation.
 	 */
-	public function setUp() {
+	public function setUp(): void {
 		parent::setUp();
 
 		$this->ids = array();

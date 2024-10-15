@@ -10,7 +10,7 @@ class WC_Mock_Background_Process extends WC_Background_Process {
 	/**
 	 * Constructor.
 	 */
-	public function __construct() {
+	public function __construct(): void {
 		// Uses unique prefix per blog so each blog has separate queue.
 		$this->prefix = 'wp_' . get_current_blog_id();
 		$this->action = 'wc_mock_background_process';
