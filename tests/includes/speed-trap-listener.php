@@ -152,7 +152,7 @@ class SpeedTrapListener implements PHPUnit_Framework_TestListener {
 	 *
 	 * @param PHPUnit_Framework_TestSuite $suite
 	 */
-	public function endTestSuite( PHPUnit\Framework\TestSuite $suite ) {
+	public function endTestSuite( PHPUnit\Framework\TestSuite $suite ): void {
 		$this->suites--;
 
 		if ( 0 === $this->suites && $this->hasSlowTests() ) {
