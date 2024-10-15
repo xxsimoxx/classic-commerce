@@ -131,7 +131,7 @@ class WC_Unit_Test_Case extends WP_HTTP_TestCase {
 	 * @param  mixed  $condition The statement to evaluate as not false.
 	 * @param  string $message   A message to display if the assertion fails.
 	 */
-	public static function assertNotFalse( $condition, $message = '' ) {
+	public static function assertNotFalse( $condition, $message = '' ): void {
 
 		if ( version_compare( phpversion(), '5.3', '<' ) ) {
 
