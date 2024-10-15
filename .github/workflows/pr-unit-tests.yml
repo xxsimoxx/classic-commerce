@@ -50,7 +50,7 @@ jobs:
         run: composer install
 
       - name: Init DB and CP
-        run: ./tests/bin/install.sh cpc_test root root 127.0.0.1 1.7.3 ${{ matrix.cp }}
+        run: ./tests/bin/install.sh cpc_test root root 127.0.0.1 1.7.1 ${{ matrix.cp }}
 
       - name: Run tests
         run: ./vendor/bin/phpunit -c ./phpunit.xml
