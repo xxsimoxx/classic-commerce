@@ -87,7 +87,7 @@ class SpeedTrapListener implements PHPUnit_Framework_TestListener {
 	 * @param Exception              $e
 	 * @param float                   $time
 	 */
-	public function addIncompleteTest( PHPUnit\Framework\Test $test, Exception $e, $time ): void {
+	public function addIncompleteTest( PHPUnit\Framework\Test $test, Throwable $e, $time ): void {
 	}
 
 	/**
@@ -98,7 +98,7 @@ class SpeedTrapListener implements PHPUnit_Framework_TestListener {
 	 * @param float                   $time
 	 * @since  Method available since Release 4.0.0
 	 */
-	public function addRiskyTest( PHPUnit\Framework\Test $test, Exception $e, $time ): void {
+	public function addRiskyTest( PHPUnit\Framework\Test $test, Throwable $e, $time ): void {
 	}
 
 	/**
@@ -108,7 +108,7 @@ class SpeedTrapListener implements PHPUnit_Framework_TestListener {
 	 * @param Exception              $e
 	 * @param float                   $time
 	 */
-	public function addSkippedTest( PHPUnit\Framework\Test $test, Exception $e, $time ): void {
+	public function addSkippedTest( PHPUnit\Framework\Test $test, Throwable $e, $time ): void {
 	}
 
 	/**
