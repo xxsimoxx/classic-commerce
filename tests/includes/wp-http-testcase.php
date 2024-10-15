@@ -174,7 +174,7 @@ abstract class WP_HTTP_TestCase extends WP_UnitTestCase {
 	 *
 	 * @since WC-1.0.0
 	 */
-	public function tearDown() {
+	public function tearDown(): void {
 
 		parent::tearDown();
 
