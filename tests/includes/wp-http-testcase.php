@@ -132,7 +132,7 @@ abstract class WP_HTTP_TestCase extends WP_UnitTestCase {
 	/**
 	 * @since WC-1.3.0
 	 */
-	public static function setUpBeforeClass() {
+	public static function setUpBeforeClass(): void {
 
 		if ( ! self::$did_init ) {
 			self::init();

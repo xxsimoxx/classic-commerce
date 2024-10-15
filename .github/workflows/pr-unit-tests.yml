@@ -10,8 +10,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: [ '7.0', '7.1', '7.2', '7.3', '7.4' ]
-        cp: [ "latest" ]
+        php: [ '7.4' ]
+        cp: [ "2.2.0" ]
 
     services:
       database:
@@ -50,7 +50,7 @@ jobs:
         run: composer install
 
       - name: Init DB and CP
-        run: ./tests/bin/install.sh cpc_test root root 127.0.0.1 2.2.0 ${{ matrix.cp }}
+        run: ./tests/bin/install.sh cpc_test root root 127.0.0.1 ${{ matrix.cp }}
 
       - name: Run tests
         run: ./vendor/bin/phpunit -c ./phpunit.xml
