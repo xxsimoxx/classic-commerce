@@ -144,7 +144,7 @@ abstract class WP_HTTP_TestCase extends WP_UnitTestCase {
 	/**
 	 * @since WC-1.3.1
 	 */
-	public static function tearDownAfterClass() {
+	public static function tearDownAfterClass(): void {
 
 		self::save_cache();
 
