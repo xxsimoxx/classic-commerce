@@ -56,7 +56,7 @@ class SpeedTrapListener implements PHPUnit_Framework_TestListener {
 	 * @param Exception              $e
 	 * @param float                   $time
 	 */
-	public function addError( PHPUnit_Framework_Test $test, Exception $e, $time ) {
+	public function addError( PHPUnit_Framework_Test $test, Exception $e, $time ): void {
 	}
 
 	/**
