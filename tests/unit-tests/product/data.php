@@ -273,7 +273,7 @@ class WC_Tests_Product_Data extends WC_Unit_Test_Case {
 		$image_url = $this->set_product_image( $product );
 
 		$this->assertEquals(
-			'<img width="186" height="144" src="' . $image_url . '" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="" />',
+			'<img width="186" height="144" src="' . $image_url . '" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="" loading="lazy" />',
 			$product->get_image()
 		);
 
@@ -295,7 +295,7 @@ class WC_Tests_Product_Data extends WC_Unit_Test_Case {
 		$image_url = $this->set_product_image( $variable_product );
 
 		$this->assertEquals(
-			'<img width="186" height="144" src="' . $image_url . '" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="" />',
+			'<img width="186" height="144" src="' . $image_url . '" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="" loading="lazy" />',
 			$variation_1->get_image()
 		);
 
