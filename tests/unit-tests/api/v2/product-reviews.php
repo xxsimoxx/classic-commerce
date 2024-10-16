@@ -18,6 +18,7 @@ class WC_Tests_API_Product_Reviews_V2 extends WC_REST_Unit_Test_Case {
 				'role' => 'administrator',
 			)
 		);
+		update_option( 'show_avatars', 1 );
 	}
 
 	/**
