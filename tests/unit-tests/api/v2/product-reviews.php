@@ -12,13 +12,13 @@ class WC_Tests_API_Product_Reviews_V2 extends WC_REST_Unit_Test_Case {
 	 * Setup our test server, endpoints, and user info.
 	 */
 	public function setUp(): void {
+		update_option( 'show_avatars', 1 );
 		parent::setUp();
 		$this->user = $this->factory->user->create(
 			array(
 				'role' => 'administrator',
 			)
 		);
-		update_option( 'show_avatars', 1 );
 	}
 
 	/**
