@@ -278,12 +278,12 @@ class WC_Tests_Product_Data extends WC_Unit_Test_Case {
 		);
 
 		$this->assertEquals(
-			'<img width="186" height="144" src="' . $image_url . '" class="attachment-single size-single" alt="" />',
+			'<img width="186" height="144" src="' . $image_url . '" class="attachment-single size-single" alt="" loading="lazy" />',
 			$product->get_image( 'single' )
 		);
 
 		$this->assertEquals(
-			'<img width="186" height="144" src="' . $image_url . '" class="custom-class" alt="" />',
+			'<img width="186" height="144" src="' . $image_url . '" class="custom-class" alt="" loading="lazy" />',
 			$product->get_image( 'single', array( 'class' => 'custom-class' ) )
 		);
 	}
@@ -300,12 +300,12 @@ class WC_Tests_Product_Data extends WC_Unit_Test_Case {
 		);
 
 		$this->assertEquals(
-			'<img width="186" height="144" src="' . $image_url . '" class="attachment-single size-single" alt="" />',
+			'<img width="186" height="144" src="' . $image_url . '" class="attachment-single size-single" alt="" loading="lazy" />',
 			$variation_1->get_image( 'single' )
 		);
 
 		$this->assertEquals(
-			'<img width="186" height="144" src="' . $image_url . '" class="custom-class" alt="" />',
+			'<img width="186" height="144" src="' . $image_url . '" class="custom-class" alt="" loading="lazy" />',
 			$variation_1->get_image( 'single', array( 'class' => 'custom-class' ) )
 		);
 	}
