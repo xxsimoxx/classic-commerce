@@ -1,14 +1,13 @@
 name: Run code sniff on PR
-on:
-  pull_request
+on: [pull_request, push]
 jobs:
   test:
     name: Code sniff (PHP 7.4, WP Latest)
     timeout-minutes: 15
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 100
 
