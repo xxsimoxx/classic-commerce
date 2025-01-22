@@ -39,7 +39,8 @@ class WC_Unit_Tests_Bootstrap {
 
 		$this->tests_dir    = dirname( __FILE__ );
 		$this->plugin_dir   = dirname( $this->tests_dir );
-		$this->cp_tests_dir = getenv( 'CP_TESTS_DIR' ) ? getenv( 'CP_TESTS_DIR' ) : '/tmp/classicpress-tests-lib';
+		//$this->cp_tests_dir = getenv( 'CP_TESTS_DIR' ) ? getenv( 'CP_TESTS_DIR' ) : '/tmp/classicpress-tests-lib';
+		$this->cp_tests_dir = dirname(dirname( __FILE__ )).'/tmp/classicpress-tests-lib';
 
 		// Load test function so tests_add_filter() is available.
 		require_once $this->cp_tests_dir . '/includes/functions.php';

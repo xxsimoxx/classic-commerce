@@ -13,9 +13,11 @@ DB_HOST=${4-localhost}
 CP_VERSION=${5-latest}
 SKIP_DB_CREATE=${6-false}
 
-TMPDIR=${TMPDIR-/tmp}
-TMPDIR=$(echo $TMPDIR | sed -e "s/\/$//")
+TMPDIR=$(pwd)'/tmp'
+mkdir $TMPDIR
+#TMPDIR=$(echo $TMPDIR | sed -e "s/\/$//")
 CP_TESTS_DIR=${CP_TESTS_DIR-$TMPDIR/classicpress-tests-lib}
+mkdir CP_TESTS_DIR
 CP_CORE_DIR=${CP_CORE_DIR-$TMPDIR/classicpress}
 
 # Remove trailing slashes
@@ -43,7 +45,7 @@ if [[ "$CP_VERSION" == latest ]]; then
 	download \
 		https://www.classicpress.net/latest.json \
 		"$TMPDIR/cp-latest.json"
-	CP_VERSION="$(grep -Po '"version":\s*"[^"]+"' "$TMPDIR/cp-latest.json" | cut -d'"' -f4)"
+	CP_VERSION="$(ggrep -Po '"version":\s*"[^"]+"' "$TMPDIR/cp-latest.json" | cut -d'"' -f4)"
 	if [ -z "$CP_VERSION" ]; then
 		echo "ClassicPress version not detected correctly!"
 		cat "$TMPDIR/cp-latest.json"
@@ -133,7 +135,7 @@ install_test_suite() {
 		download "$CP_DEV_ZIP_URL" "$CP_DEV_ZIP_PATH"
 		unzip -q "$CP_DEV_ZIP_PATH" -d "$CP_DEV_PATH"
 		clean_github_download "$CP_DEV_PATH" false
-		cp -ar \
+		cp -r \
 			"$CP_DEV_PATH/tests/phpunit/includes" \
 			"$CP_DEV_PATH/tests/phpunit/data" \
 			"$CP_TESTS_DIR/"
@@ -273,4 +275,4 @@ PHP
 install_cp
 install_test_suite
 install_db
-install_e2e_site
+#install_e2e_site
