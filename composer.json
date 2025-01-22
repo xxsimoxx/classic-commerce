@@ -7,7 +7,8 @@
   "prefer-stable": true,
   "minimum-stability": "dev",
   "require": {
-    "composer/installers": "~1.2"
+    "composer/installers": "~1.2",
+    "pelago/emogrifier": "~7.3"
   },
   "require-dev": {
     "phpunit/phpunit": "8.*",
