@@ -275,4 +275,4 @@ PHP
 install_cp
 install_test_suite
 install_db
-#install_e2e_site
+install_e2e_site
