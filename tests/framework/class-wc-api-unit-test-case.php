@@ -13,9 +13,9 @@ class WC_API_Unit_Test_Case extends WC_Unit_Test_Case {
 	 * Setup the test case case.
 	 *
 	 * @since WC-2.2
-	 * @see WC_Unit_Test_Case::setUp()
+	 * @see WC_Unit_Test_Case::setUp():void
 	 */
-	public function setUp() {
+	public function setUp():void {
 
 		parent::setUp();
 

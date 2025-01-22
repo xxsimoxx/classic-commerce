@@ -27,7 +27,7 @@ class WC_Unit_Test_Case extends WP_HTTP_TestCase {
 	 *
 	 * @since WC-2.2
 	 */
-	public function setUp() {
+	public function setUp():void {
 
 		parent::setUp();
 
@@ -49,7 +49,7 @@ class WC_Unit_Test_Case extends WP_HTTP_TestCase {
 	 *
 	 * @since WC-3.5.0
 	 */
-	public static function setUpBeforeClass() {
+	public static function setUpBeforeClass():void {
 		parent::setUpBeforeClass();
 
 		// Terms are deleted in WP_UnitTestCase::tearDownAfterClass, then e.g. Uncategorized product_cat is missing.
@@ -131,7 +131,7 @@ class WC_Unit_Test_Case extends WP_HTTP_TestCase {
 	 * @param  mixed  $condition The statement to evaluate as not false.
 	 * @param  string $message   A message to display if the assertion fails.
 	 */
-	public static function assertNotFalse( $condition, $message = '' ) {
+	public static function assertNotFalse( $condition, $message = '' ):void {
 
 		if ( version_compare( phpversion(), '5.3', '<' ) ) {
 

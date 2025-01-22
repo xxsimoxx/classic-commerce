@@ -9,7 +9,7 @@ class WC_Tests_CRUD_Data extends WC_Unit_Test_Case {
 	/**
 	 * Restore UTC on failire.
 	 */
-	 public function tearDown() {
+	 public function tearDown():void {
  		parent::tearDown();
 		// @codingStandardsIgnoreStart
 		date_default_timezone_set( 'UTC' );
@@ -18,7 +18,7 @@ class WC_Tests_CRUD_Data extends WC_Unit_Test_Case {
 		update_option( 'timezone_string', '' );
 	}
 
-	public function onNotSuccessfulTest( Throwable $e ) {
+	public function onNotSuccessfulTest( Throwable $e ):void {
 		// @codingStandardsIgnoreStart
 		date_default_timezone_set( 'UTC' );
 		// @codingStandardsIgnoreEnd

@@ -10,7 +10,7 @@
  */
 class WC_Tests_Session_Handler extends WC_Unit_Test_Case {
 
-	public function setUp() {
+	public function setUp():void {
 		parent::setUp();
 
 		$this->handler = new WC_Session_Handler();
