@@ -4,8 +4,8 @@
  *
  * Handles requests to the /settings/$group/$setting endpoints.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Setting Options controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Setting_Options_V2_Controller
  */
 class WC_REST_Setting_Options_Controller extends WC_REST_Setting_Options_V2_Controller {
@@ -102,7 +102,7 @@ class WC_REST_Setting_Options_Controller extends WC_REST_Setting_Options_V2_Cont
 			} elseif ( 'single_select_country' === $setting['type'] ) {
 				$setting['type']    = 'select';
 				$setting['options'] = $this->get_countries_and_states();
-			} elseif ( 'single_select_page' === $setting['type'] ) {
+			} elseif ( $setting['type'] === 'single_select_page' || $setting['type'] === 'single_select_page_with_search' ) {
 				$pages   = get_pages(
 					array(
 						'sort_column'  => 'menu_order',
@@ -127,7 +127,7 @@ class WC_REST_Setting_Options_Controller extends WC_REST_Setting_Options_V2_Cont
 	/**
 	 * Returns a list of countries and states for use in the base location setting.
 	 *
-	 * @since  WC-3.0.7
+	 * @since  3.0.7
 	 * @return array Array of states and countries.
 	 */
 	private function get_countries_and_states() {

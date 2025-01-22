@@ -4,8 +4,8 @@
  *
  * Handles requests to the /payment_gateways endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Paymenga gateways controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Payment_Gateways_V2_Controller
  */
 class WC_REST_Payment_Gateways_Controller extends WC_REST_Payment_Gateways_V2_Controller {

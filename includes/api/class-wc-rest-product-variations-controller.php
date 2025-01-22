@@ -4,8 +4,8 @@
  *
  * Handles requests to the /products/<product_id>/variations endpoints.
  *
- * @package ClassicCommerce\API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API variations controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Product_Variations_V2_Controller
  */
 class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V2_Controller {
@@ -25,6 +25,42 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 	 */
 	protected $namespace = 'wc/v3';
 
+    /**
+	 * Register the routes for products.
+	 */
+	public function register_routes() {
+		parent::register_routes();
+
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/generate',
+			array(
+				'args'   => array(
+					'product_id'     => array(
+						'description' => __( 'Unique identifier for the variable product.', 'classic-commerce' ),
+						'type'        => 'integer',
+					),
+					'delete'         => array(
+						'description' => __( 'Deletes unused variations.', 'classic-commerce' ),
+						'type'        => 'boolean',
+					),
+					'default_values' => array(
+						'description' => __( 'Default values for generated variations.', 'classic-commerce' ),
+						'type'        => 'object',
+						'properties'  => $this->get_endpoint_args_for_item_schema( WP_REST_Server::EDITABLE ),
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'generate' ),
+					'permission_callback' => array( $this, 'create_item_permissions_check' ),
+					'args'                => $this->get_endpoint_args_for_item_schema( WP_REST_Server::CREATABLE ),
+				),
+				'schema' => array( $this, 'get_public_item_schema' ),
+			)
+		);
+	}
+
 	/**
 	 * Prepare a single variation output for response.
 	 *
@@ -33,8 +69,10 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 	 * @return WP_REST_Response
 	 */
 	public function prepare_object_for_response( $object, $request ) {
-		$data = array(
+		$context = ! empty( $request['context'] ) ? $request['context'] : 'view';
+		$data    = array(
 			'id'                    => $object->get_id(),
+            'type'                  => $object->get_type(),
 			'date_created'          => wc_rest_prepare_date_response( $object->get_date_created(), false ),
 			'date_created_gmt'      => wc_rest_prepare_date_response( $object->get_date_created() ),
 			'date_modified'         => wc_rest_prepare_date_response( $object->get_date_modified(), false ),
@@ -65,6 +103,7 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 			'backorders'            => $object->get_backorders(),
 			'backorders_allowed'    => $object->backorders_allowed(),
 			'backordered'           => $object->is_on_backorder(),
+			'low_stock_amount'      => '' === $object->get_low_stock_amount() ? null : $object->get_low_stock_amount(),
 			'weight'                => $object->get_weight(),
 			'dimensions'            => array(
 				'length' => $object->get_length(),
@@ -73,13 +112,14 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 			),
 			'shipping_class'        => $object->get_shipping_class(),
 			'shipping_class_id'     => $object->get_shipping_class_id(),
-			'image'                 => $this->get_image( $object ),
+			'image'                 => $this->get_image( $object, $context ),
 			'attributes'            => $this->get_attributes( $object ),
 			'menu_order'            => $object->get_menu_order(),
 			'meta_data'             => $object->get_meta_data(),
+            'name'                  => wc_get_formatted_variation( $object, true, false, false ),
+			'parent_id'             => $object->get_parent_id(),
 		);
 
-		$context  = ! empty( $request['context'] ) ? $request['context'] : 'view';
 		$data     = $this->add_additional_fields_to_object( $data, $request );
 		$data     = $this->filter_response_by_context( $data, $context );
 		$response = rest_ensure_response( $data );
@@ -185,9 +225,18 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 				$stock_quantity += wc_stock_amount( $request['inventory_delta'] );
 				$variation->set_stock_quantity( $stock_quantity );
 			}
+			// isset() returns false for value null, thus we need to check whether the value has been sent by the request.
+			if ( array_key_exists( 'low_stock_amount', $request->get_params() ) ) {
+				if ( null === $request['low_stock_amount'] ) {
+					$variation->set_low_stock_amount( '' );
+				} else {
+					$variation->set_low_stock_amount( wc_stock_amount( $request['low_stock_amount'] ) );
+				}
+			}
 		} else {
 			$variation->set_backorders( 'no' );
 			$variation->set_stock_quantity( '' );
+			$variation->set_low_stock_amount( '' );
 		}
 
 		// Regular Price.
@@ -234,9 +283,9 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 			if ( ! $parent ) {
 				return new WP_Error(
 					// Translators: %d parent ID.
-					"woocommerce_rest_{$this->post_type}_invalid_parent", sprintf( __( 'Cannot set attributes due to invalid parent product.', 'classic-commerce' ), $variation->get_parent_id() ), array(
-						'status' => 404,
-					)
+					"woocommerce_rest_{$this->post_type}_invalid_parent",
+					__( 'Cannot set attributes due to invalid parent product.', 'classic-commerce' ),
+					array( 'status' => 404 )
 				);
 			}
 
@@ -313,8 +362,8 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 	 * @param WC_Product_Variation $variation Variation data.
 	 * @return array
 	 */
-	protected function get_image( $variation ) {
-		if ( ! $variation->get_image_id() ) {
+	protected function get_image( $variation, $context = 'view' ) {
+		if ( ! $variation->get_image_id( $context ) ) {
 			return;
 		}
 
@@ -354,16 +403,21 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 	protected function set_variation_image( $variation, $image ) {
 		$attachment_id = isset( $image['id'] ) ? absint( $image['id'] ) : 0;
 
-		if ( 0 === $attachment_id && isset( $image['src'] ) ) {
-			$upload = wc_rest_upload_image_from_url( esc_url_raw( $image['src'] ) );
+		if ( 0 === $attachment_id ) {
+			if ( isset( $image['src'] ) ) {
+				$upload = wc_rest_upload_image_from_url( esc_url_raw( $image['src'] ) );
 
-			if ( is_wp_error( $upload ) ) {
-				if ( ! apply_filters( 'woocommerce_rest_suppress_image_upload_error', false, $upload, $variation->get_id(), array( $image ) ) ) {
-					throw new WC_REST_Exception( 'woocommerce_variation_image_upload_error', $upload->get_error_message(), 400 );
+				if ( is_wp_error( $upload ) ) {
+					if ( ! apply_filters( 'woocommerce_rest_suppress_image_upload_error', false, $upload, $variation->get_id(), array( $image ) ) ) {
+						throw new WC_REST_Exception( 'woocommerce_variation_image_upload_error', $upload->get_error_message(), 400 );
+					}
 				}
-			}
 
-			$attachment_id = wc_rest_set_uploaded_image_as_attachment( $upload, $variation->get_id() );
+				$attachment_id = wc_rest_set_uploaded_image_as_attachment( $upload, $variation->get_id() );
+			} else {
+				$variation->set_image_id( '' );
+				return $variation;
+			}
 		}
 
 		if ( ! wp_attachment_is_image( $attachment_id ) ) {
@@ -407,6 +461,12 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 				'id'                    => array(
 					'description' => __( 'Unique identifier for the resource.', 'classic-commerce' ),
 					'type'        => 'integer',
+					'context'     => array( 'view', 'edit' ),
+					'readonly'    => true,
+				),
+                'type'                  => array(
+					'description' => __( 'Product type.', 'classic-commerce' ),
+					'type'        => 'string',
 					'context'     => array( 'view', 'edit' ),
 					'readonly'    => true,
 				),
@@ -592,6 +652,11 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 					'context'     => array( 'view', 'edit' ),
 					'readonly'    => true,
 				),
+				'low_stock_amount'       => array(
+					'description' => __( 'Low Stock amount for the variation.', 'classic-commerce' ),
+					'type'        => array( 'integer', 'null' ),
+					'context'     => array( 'view', 'edit' ),
+				),
 				'weight'                => array(
 					/* translators: %s: weight unit */
 					'description' => sprintf( __( 'Variation weight (%s).', 'classic-commerce' ), $weight_unit ),
@@ -750,7 +815,7 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 	/**
 	 * Prepare objects query.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WP_REST_Request $request Full details about the request.
 	 * @return array
 	 */
@@ -760,60 +825,40 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 		// Set post_status.
 		$args['post_status'] = $request['status'];
 
-		// Taxonomy query to filter products by type, category,
-		// tag, shipping class, and attribute.
-		$tax_query = array();
-
-		// Map between taxonomy name and arg's key.
-		$taxonomies = array(
-			'product_cat'            => 'category',
-			'product_tag'            => 'tag',
-			'product_shipping_class' => 'shipping_class',
-		);
-
-		// Set tax_query for each passed arg.
-		foreach ( $taxonomies as $taxonomy => $key ) {
-			if ( ! empty( $request[ $key ] ) ) {
-				$tax_query[] = array(
-					'taxonomy' => $taxonomy,
-					'field'    => 'term_id',
-					'terms'    => $request[ $key ],
+        /**
+		 * @deprecated WC-8.1.0 replaced by attributes.
+		 * Filter by local attributes.
+		 */
+		if ( ! empty( $request['local_attributes'] ) && is_array( $request['local_attributes'] ) ) {
+            wc_deprecated_argument( 'local_attributes', '8.1', 'Use "attributes" instead.' );
+			foreach ( $request['local_attributes'] as $attribute ) {
+				if ( ! isset( $attribute['attribute'] ) || ! isset( $attribute['term'] ) ) {
+					continue;
+				}
+				$args['meta_query'] = $this->add_meta_query( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					$args,
+					array(
+						'key'   => 'attribute_' . $attribute['attribute'],
+						'value' => $attribute['term'],
+					)
 				);
 			}
 		}
 
-		// Filter product type by slug.
-		if ( ! empty( $request['type'] ) ) {
-			$tax_query[] = array(
-				'taxonomy' => 'product_type',
-				'field'    => 'slug',
-				'terms'    => $request['type'],
-			);
-		}
-
-		// Filter by attribute and term.
-		if ( ! empty( $request['attribute'] ) && ! empty( $request['attribute_term'] ) ) {
-			if ( in_array( $request['attribute'], wc_get_attribute_taxonomy_names(), true ) ) {
-				$tax_query[] = array(
-					'taxonomy' => $request['attribute'],
-					'field'    => 'term_id',
-					'terms'    => $request['attribute_term'],
+        // Filter by attributes.
+		if ( ! empty( $request['attributes'] ) && is_array( $request['attributes'] ) ) {
+			foreach ( $request['attributes'] as $attribute ) {
+				if ( ! isset( $attribute['attribute'] ) || ! isset( $attribute['term'] ) ) {
+					continue;
+				}
+				$args['meta_query'] = $this->add_meta_query( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					$args,
+					array(
+						'key'   => 'attribute_' . $attribute['attribute'],
+						'value' => $attribute['term'],
+					)
 				);
 			}
-		}
-
-		if ( ! empty( $tax_query ) ) {
-			$args['tax_query'] = $tax_query; // WPCS: slow query ok.
-		}
-
-		// Filter featured.
-		if ( is_bool( $request['featured'] ) ) {
-			$args['tax_query'][] = array(
-				'taxonomy' => 'product_visibility',
-				'field'    => 'name',
-				'terms'    => 'featured',
-				'operator' => true === $request['featured'] ? 'IN' : 'NOT IN',
-			);
 		}
 
 		// Filter by sku.
@@ -825,7 +870,8 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 			}
 
 			$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
-				$args, array(
+				$args,
+				array(
 					'key'     => '_sku',
 					'value'   => $skus,
 					'compare' => 'IN',
@@ -836,7 +882,8 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 		// Filter by tax class.
 		if ( ! empty( $request['tax_class'] ) ) {
 			$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
-				$args, array(
+				$args,
+				array(
 					'key'   => '_tax_class',
 					'value' => 'standard' !== $request['tax_class'] ? $request['tax_class'] : '',
 				)
@@ -848,10 +895,48 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 			$args['meta_query'] = $this->add_meta_query( $args, wc_get_min_max_price_meta_query( $request ) );  // WPCS: slow query ok.
 		}
 
+        // Price filter.
+		if ( is_bool( $request['has_price'] ) ) {
+            if ( $request['has_price'] ) {
+				$args['meta_query'] = $this->add_meta_query( // phpcs:ignore Standard.Category.SniffName.ErrorCode slow query ok.
+					$args,
+					array(
+						'relation' => 'AND',
+						array(
+							'key'     => '_price',
+							'compare' => 'EXISTS',
+						),
+						array(
+							'key'     => '_price',
+							'compare' => '!=',
+							'value'   => null,
+						),
+					)
+				);
+			} else {
+				$args['meta_query'] = $this->add_meta_query( // phpcs:ignore Standard.Category.SniffName.ErrorCode slow query ok.
+					$args,
+					array(
+						'relation' => 'OR',
+						array(
+							'key'     => '_price',
+							'compare' => 'NOT EXISTS',
+						),
+						array(
+							'key'     => '_price',
+							'compare' => '=',
+							'value'   => null,
+						),
+					)
+				);
+			}
+		}
+
 		// Filter product based on stock_status.
 		if ( ! empty( $request['stock_status'] ) ) {
 			$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
-				$args, array(
+				$args,
+				array(
 					'key'   => '_stock_status',
 					'value' => $request['stock_status'],
 				)
@@ -889,7 +974,17 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 	public function get_collection_params() {
 		$params = parent::get_collection_params();
 
-		unset( $params['in_stock'] );
+		unset(
+			$params['in_stock'],
+			$params['type'],
+			$params['featured'],
+			$params['category'],
+			$params['tag'],
+			$params['shipping_class'],
+			$params['attribute'],
+			$params['attribute_term']
+		);
+
 		$params['stock_status'] = array(
 			'description'       => __( 'Limit result set to products with specified stock status.', 'classic-commerce' ),
 			'type'              => 'string',
@@ -898,6 +993,50 @@ class WC_REST_Product_Variations_Controller extends WC_REST_Product_Variations_V
 			'validate_callback' => 'rest_validate_request_arg',
 		);
 
+        $params['attributes'] = array(
+			'description'       => __( 'Limit result set to products with specified attributes.', 'classic-commerce' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type' 		 => 'object',
+				'properties' => array(
+					'attribute'           => array(
+						'type'        => 'string',
+						'description' => __( 'Attribute slug.', 'classic-commerce' ),
+					),
+					'term'  => array(
+						'type'        => 'string',
+						'description' => __( 'Attribute term.', 'classic-commerce' ),
+					),
+				),
+			),
+		);
+
 		return $params;
+	}
+
+    /**
+	 * Generate all variations for a given product.
+	 *
+	 * @param WP_REST_Request $request Full details about the request.
+	 * @return WP_Error|WP_REST_Response
+	 */
+	public function generate( $request ) {
+		$product_id = (int) $request['product_id'];
+
+		if ( 'product' !== get_post_type( $product_id ) ) {
+            return new WP_Error( 'woocommerce_rest_product_invalid_id', __( 'Invalid product ID.', 'woocommerce' ), array( 'status' => 404 ) );
+		}
+
+		wc_maybe_define_constant( 'WC_MAX_LINKED_VARIATIONS', 50 );
+		wc_set_time_limit( 0 );
+
+		$response          = array();
+		$product           = wc_get_product( $product_id );
+		$data_store        = $product->get_data_store();
+		$response['count'] = $data_store->create_all_product_variations( $product, WC_MAX_LINKED_VARIATIONS, $default_value );
+
+		$data_store->sort_all_product_variations( $product->get_id() );
+
+		return rest_ensure_response( $response );
 	}
 }

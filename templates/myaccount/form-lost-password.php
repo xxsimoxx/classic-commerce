@@ -6,7 +6,7 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates
- * @version WC-3.5.2
+ * @version WC-9.2.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -19,8 +19,8 @@ do_action( 'woocommerce_before_lost_password_form' );
 	<p><?php echo apply_filters( 'woocommerce_lost_password_message', esc_html__( 'Lost your password? Please enter your username or email address. You will receive a link to create a new password via email.', 'classic-commerce' ) ); ?></p><?php // @codingStandardsIgnoreLine ?>
 
 	<p class="woocommerce-form-row woocommerce-form-row--first form-row form-row-first">
-		<label for="user_login"><?php esc_html_e( 'Username or email', 'classic-commerce' ); ?></label>
-		<input class="woocommerce-Input woocommerce-Input--text input-text" type="text" name="user_login" id="user_login" autocomplete="username" />
+		<label for="user_login"><?php esc_html_e( 'Username or email', 'classic-commerce' ); ?>&nbsp;<span class="required" aria-hidden="true">*</span><span class="screen-reader-text"><?php esc_html_e( 'Required', 'classic-commerce' ); ?></span></label>
+		<input class="woocommerce-Input woocommerce-Input--text input-text" type="text" name="user_login" id="user_login" autocomplete="username" required aria-required="true"/>
 	</p>
 
 	<div class="clear"></div>

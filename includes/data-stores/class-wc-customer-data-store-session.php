@@ -48,6 +48,7 @@ class WC_Customer_Data_Store_Session extends WC_Data_Store_WP implements WC_Cust
 		'shipping_first_name',
 		'shipping_last_name',
 		'shipping_company',
+        'shipping_phone',
 	);
 
 	/**
@@ -74,14 +75,39 @@ class WC_Customer_Data_Store_Session extends WC_Data_Store_WP implements WC_Cust
 	 * @param WC_Customer $customer Customer object.
 	 */
 	public function save_to_session( $customer ) {
-		$data = array();
+        $data = array();
 		foreach ( $this->session_keys as $session_key ) {
 			$function_key = $session_key;
 			if ( 'billing_' === substr( $session_key, 0, 8 ) ) {
 				$session_key = str_replace( 'billing_', '', $session_key );
 			}
-			$data[ $session_key ] = (string) $customer->{"get_$function_key"}( 'edit' );
-		}
+			if ( 'meta_data' === $session_key ) {
+				/**
+				 * Filter the allowed session meta data keys.
+				 *
+				 * If the customer object contains any meta data with these keys, it will be stored within the Classic Commerce session.
+				 *
+				 * @since WC-8.7.0
+				 * @param array $allowed_keys The allowed meta data keys.
+				 * @param WC_Customer $customer The customer object.
+				 */
+		$allowed_keys = apply_filters( 'woocommerce_customer_allowed_session_meta_keys', array(), $customer );
+
+				$session_value = array();
+				foreach ( $customer->get_meta_data() as $meta_data ) {
+					if ( in_array( $meta_data->key, $allowed_keys, true ) ) {
+						$session_value[] = array(
+							'key'   => $meta_data->key,
+							'value' => $meta_data->value,
+						);
+					}
+				}
+				$data['meta_data'] = $session_value;
+			} else {
+                $session_value        = $customer->{"get_$function_key"}( 'edit' );
+				$data[ $session_key ] = (string) $session_value;
+			}
+        }
 		WC()->session->set( 'customer', $data );
 	}
 
@@ -126,12 +152,13 @@ class WC_Customer_Data_Store_Session extends WC_Data_Store_WP implements WC_Cust
 	protected function set_defaults( &$customer ) {
 		try {
 			$default = wc_get_customer_default_location();
+            $has_shipping_address = $customer->has_shipping_address();
 
 			if ( ! $customer->get_billing_country() ) {
 				$customer->set_billing_country( $default['country'] );
 			}
 
-			if ( ! $customer->get_shipping_country() ) {
+			if ( ! $customer->get_shipping_country() && ! $has_shipping_address ) {
 				$customer->set_shipping_country( $customer->get_billing_country() );
 			}
 
@@ -139,7 +166,7 @@ class WC_Customer_Data_Store_Session extends WC_Data_Store_WP implements WC_Cust
 				$customer->set_billing_state( $default['state'] );
 			}
 
-			if ( ! $customer->get_shipping_state() ) {
+			if ( ! $customer->get_shipping_state() && ! $has_shipping_address ) {
 				$customer->set_shipping_state( $customer->get_billing_state() );
 			}
 

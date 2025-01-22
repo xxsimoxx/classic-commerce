@@ -8,6 +8,9 @@
  * @version WC-3.0.0
  */
 
+ use ClassicCommerce\Utilities\NumberUtil;
+ use ClassicCommerce\Utilities\StringUtil;
+
 defined( 'ABSPATH' ) || exit;
 
 require_once dirname( __FILE__ ) . '/legacy/class-wc-legacy-coupon.php';
@@ -20,12 +23,13 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Data array, with defaults.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @var array
 	 */
 	protected $data = array(
 		'code'                        => '',
 		'amount'                      => 0,
+		'status'                      => null,
 		'date_created'                => null,
 		'date_modified'               => null,
 		'date_expires'                => null,
@@ -65,6 +69,8 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	const E_WC_COUPON_MAX_SPEND_LIMIT_MET            = 112;
 	const E_WC_COUPON_EXCLUDED_PRODUCTS              = 113;
 	const E_WC_COUPON_EXCLUDED_CATEGORIES            = 114;
+	const E_WC_COUPON_USAGE_LIMIT_COUPON_STUCK       = 115;
+	const E_WC_COUPON_USAGE_LIMIT_COUPON_STUCK_GUEST = 116;
 	const WC_COUPON_SUCCESS                          = 200;
 	const WC_COUPON_REMOVED                          = 201;
 
@@ -74,6 +80,27 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	 * @var string
 	 */
 	protected $cache_group = 'coupons';
+
+	/**
+	 * Error message.
+	 *
+	 * This property should not be considered public API, and should not be accessed directly.
+	 * It is being added to supress PHP > 8.0 warnings against dynamic property creation, and all access
+	 * should be through the getter and setter methods, namely `get_error_message()` and `set_error_message()`.
+	 * In the future, the access modifier may be changed back to protected.
+	 *
+	 * @var string
+	 */
+	public $error_message;
+
+	/**
+	 * Sorting.
+	 *
+	 * Used by `get_coupons_from_cart` to sort coupons.
+	 *
+	 * @var int
+	 */
+	public $sort = 0;
 
 	/**
 	 * Coupon constructor. Loads coupon data.
@@ -91,7 +118,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 		}
 
 		// This filter allows custom coupon objects to be created on the fly.
-		$coupon = apply_filters( 'woocommerce_get_shop_coupon_data', false, $data );
+		$coupon = apply_filters( 'woocommerce_get_shop_coupon_data', false, $data, $this );
 
 		if ( $coupon ) {
 			$this->read_manual_coupon( $data, $coupon );
@@ -101,7 +128,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 		// Try to load coupon using ID or code.
 		if ( is_int( $data ) && 'shop_coupon' === get_post_type( $data ) ) {
 			$this->set_id( $data );
-		} elseif ( ! empty( $data ) ) {
+		} elseif ( is_string( $data ) && ! StringUtil::is_null_or_whitespace( $data ) ) {
 			$id = wc_get_coupon_id_by_code( $data );
 			// Need to support numeric strings for backwards compatibility.
 			if ( ! $id && 'shop_coupon' === get_post_type( $data ) ) {
@@ -120,7 +147,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * If the object has an ID, read using the data store.
 	 *
-	 * @since WC-3.4.1
+	 * @since 3.4.1
 	 */
 	protected function read_object_from_database() {
 		$this->data_store = WC_Data_Store::load( 'coupon' );
@@ -132,7 +159,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Checks the coupon type.
 	 *
-	 * @param  string $type Array or string of types.
+	 * @param  string|array $type Array or string of types.
 	 * @return bool
 	 */
 	public function is_type( $type ) {
@@ -142,7 +169,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Prefix for action and filter hooks on data.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @return string
 	 */
 	protected function get_hook_prefix() {
@@ -161,7 +188,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get coupon code.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return string
 	 */
@@ -172,7 +199,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get coupon description.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return string
 	 */
@@ -181,9 +208,20 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	}
 
 	/**
+	 * Get coupon status.
+	 *
+	 * @since  6.2.0
+	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
+	 * @return string
+	 */
+	public function get_status( $context = 'view' ) {
+		return $this->get_prop( 'status', $context );
+	}
+
+	/**
 	 * Get discount type.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return string
 	 */
@@ -194,18 +232,18 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get coupon amount.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
-	 * @return float
+	 * @return string
 	 */
 	public function get_amount( $context = 'view' ) {
-		return (float) $this->get_prop( 'amount', $context );
+		return wc_format_decimal( $this->get_prop( 'amount', $context ) );
 	}
 
 	/**
 	 * Get coupon expiration date.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return WC_DateTime|NULL object if the date is set or null if there is no date.
 	 */
@@ -216,7 +254,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get date_created
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return WC_DateTime|NULL object if the date is set or null if there is no date.
 	 */
@@ -227,7 +265,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get date_modified
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return WC_DateTime|NULL object if the date is set or null if there is no date.
 	 */
@@ -238,7 +276,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get coupon usage count.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return integer
 	 */
@@ -247,9 +285,9 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	}
 
 	/**
-	 * Get the "indvidual use" checkbox status.
+	 * Get the "individual use" checkbox status.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return bool
 	 */
@@ -260,7 +298,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get product IDs this coupon can apply to.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return array
 	 */
@@ -271,7 +309,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get product IDs that this coupon should not apply to.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return array
 	 */
@@ -282,7 +320,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get coupon usage limit.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return integer
 	 */
@@ -293,7 +331,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get coupon usage limit per customer (for a single customer)
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return integer
 	 */
@@ -304,7 +342,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Usage limited to certain amount of items
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return integer|null
 	 */
@@ -315,7 +353,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * If this coupon grants free shipping or not.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return bool
 	 */
@@ -326,7 +364,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get product categories this coupon can apply to.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return array
 	 */
@@ -337,7 +375,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get product categories this coupon cannot not apply to.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return array
 	 */
@@ -348,7 +386,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * If this coupon should exclude items on sale.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return bool
 	 */
@@ -359,7 +397,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get minimum spend amount.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return float
 	 */
@@ -369,7 +407,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get maximum spend amount.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return float
 	 */
@@ -380,7 +418,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get emails to check customer usage restrictions.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return array
 	 */
@@ -391,7 +429,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Get records of all users who have used the current coupon.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return array
 	 */
@@ -402,7 +440,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * If the filter is added through the woocommerce_get_shop_coupon_data filter, it's virtual and not in the DB.
 	 *
-	 * @since WC-3.2.0
+	 * @since 3.2.0
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return boolean
 	 */
@@ -446,7 +484,14 @@ class WC_Coupon extends WC_Legacy_Coupon {
 			$discount = $single ? $discount : $discount * $cart_item_qty;
 		}
 
-		return apply_filters( 'woocommerce_coupon_get_discount_amount', round( min( $discount, $discounting_amount ), wc_get_rounding_precision() ), $discounting_amount, $cart_item, $single, $this );
+		return apply_filters(
+			'woocommerce_coupon_get_discount_amount',
+			NumberUtil::round( min( $discount, $discounting_amount ), wc_get_rounding_precision() ),
+			$discounting_amount,
+			$cart_item,
+			$single,
+			$this
+		);
 	}
 
 	/*
@@ -463,7 +508,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set coupon code.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param string $code Coupon code.
 	 */
 	public function set_code( $code ) {
@@ -473,7 +518,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set coupon description.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param string $description Description.
 	 */
 	public function set_description( $description ) {
@@ -481,9 +526,19 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	}
 
 	/**
+	 * Set coupon status.
+	 *
+	 * @since 3.0.0
+	 * @param string $status Status.
+	 */
+	public function set_status( $status ) {
+		$this->set_prop( 'status', $status );
+	}
+
+	/**
 	 * Set discount type.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param string $discount_type Discount type.
 	 */
 	public function set_discount_type( $discount_type ) {
@@ -499,7 +554,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set amount.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param float $amount Amount.
 	 */
 	public function set_amount( $amount ) {
@@ -523,7 +578,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set expiration date.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param string|integer|null $date UTC timestamp, or ISO 8601 DateTime. If the DateTime string has no timezone or offset, WordPress site timezone will be assumed. Null if there is no date.
 	 */
 	public function set_date_expires( $date ) {
@@ -533,7 +588,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set date_created
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param string|integer|null $date UTC timestamp, or ISO 8601 DateTime. If the DateTime string has no timezone or offset, WordPress site timezone will be assumed. Null if there is no date.
 	 */
 	public function set_date_created( $date ) {
@@ -543,7 +598,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set date_modified
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param string|integer|null $date UTC timestamp, or ISO 8601 DateTime. If the DateTime string has no timezone or offset, WordPress site timezone will be assumed. Null if there is no date.
 	 */
 	public function set_date_modified( $date ) {
@@ -553,7 +608,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set how many times this coupon has been used.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param int $usage_count Usage count.
 	 */
 	public function set_usage_count( $usage_count ) {
@@ -563,7 +618,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set if this coupon can only be used once.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param bool $is_individual_use If is for individual use.
 	 */
 	public function set_individual_use( $is_individual_use ) {
@@ -573,7 +628,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set the product IDs this coupon can be used with.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param array $product_ids Products IDs.
 	 */
 	public function set_product_ids( $product_ids ) {
@@ -583,7 +638,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set the product IDs this coupon cannot be used with.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param array $excluded_product_ids Exclude product IDs.
 	 */
 	public function set_excluded_product_ids( $excluded_product_ids ) {
@@ -593,7 +648,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set the amount of times this coupon can be used.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param int $usage_limit Usage limit.
 	 */
 	public function set_usage_limit( $usage_limit ) {
@@ -603,7 +658,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set the amount of times this coupon can be used per user.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param int $usage_limit Usage limit.
 	 */
 	public function set_usage_limit_per_user( $usage_limit ) {
@@ -613,7 +668,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set usage limit to x number of items.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param int|null $limit_usage_to_x_items Limit usage to X items.
 	 */
 	public function set_limit_usage_to_x_items( $limit_usage_to_x_items ) {
@@ -623,7 +678,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set if this coupon enables free shipping or not.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param bool $free_shipping If grant free shipping.
 	 */
 	public function set_free_shipping( $free_shipping ) {
@@ -633,7 +688,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set the product category IDs this coupon can be used with.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param array $product_categories List of product categories.
 	 */
 	public function set_product_categories( $product_categories ) {
@@ -643,7 +698,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set the product category IDs this coupon cannot be used with.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param array $excluded_product_categories List of excluded product categories.
 	 */
 	public function set_excluded_product_categories( $excluded_product_categories ) {
@@ -653,7 +708,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set if this coupon should excluded sale items or not.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param bool $exclude_sale_items If should exclude sale items.
 	 */
 	public function set_exclude_sale_items( $exclude_sale_items ) {
@@ -663,8 +718,8 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set the minimum spend amount.
 	 *
-	 * @since WC-3.0.0
-	 * @param float $amount Minium amount.
+	 * @since 3.0.0
+	 * @param float $amount Minimum amount.
 	 */
 	public function set_minimum_amount( $amount ) {
 		$this->set_prop( 'minimum_amount', wc_format_decimal( $amount ) );
@@ -673,7 +728,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set the maximum spend amount.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param float $amount Maximum amount.
 	 */
 	public function set_maximum_amount( $amount ) {
@@ -683,7 +738,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set email restrictions.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param array $emails List of emails.
 	 */
 	public function set_email_restrictions( $emails = array() ) {
@@ -699,7 +754,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Set which users have used this coupon.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param array $used_by List of user IDs.
 	 */
 	public function set_used_by( $used_by ) {
@@ -710,7 +765,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	 * Set coupon virtual state.
 	 *
 	 * @param boolean $virtual Whether it is virtual or not.
-	 * @since WC-3.2.0
+	 * @since 3.2.0
 	 */
 	public function set_virtual( $virtual ) {
 		$this->set_prop( 'virtual', (bool) $virtual );
@@ -725,7 +780,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Developers can programmatically return coupons. This function will read those values into our WC_Coupon class.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param string $code   Coupon code.
 	 * @param array  $coupon Array of coupon properties.
 	 */
@@ -774,11 +829,12 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	/**
 	 * Increase usage count for current coupon.
 	 *
-	 * @param string $used_by Either user ID or billing email.
+	 * @param string   $used_by  Either user ID or billing email.
+	 * @param WC_Order $order  If provided, will clear the coupons held by this order.
 	 */
-	public function increase_usage_count( $used_by = '' ) {
+	public function increase_usage_count( $used_by = '', $order = null ) {
 		if ( $this->get_id() && $this->data_store ) {
-			$new_count = $this->data_store->increase_usage_count( $this, $used_by );
+			$new_count = $this->data_store->increase_usage_count( $this, $used_by, $order );
 
 			// Bypass set_prop and remove pending changes since the data store saves the count already.
 			$this->data['usage_count'] = $new_count;
@@ -813,8 +869,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 
 	/**
 	 * Returns the error_message string.
-	 *
-	 * @access public
+
 	 * @return string
 	 */
 	public function get_error_message() {
@@ -822,9 +877,20 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	}
 
 	/**
+	 * Sets the error_message string.
+	 *
+	 * @param string $message Message string.
+	 *
+	 * @return void
+	 */
+	public function set_error_message( string $message ) {
+		$this->error_message = $message;
+	}
+
+	/**
 	 * Check if a coupon is valid for the cart.
 	 *
-	 * @deprecated WC-3.2.0 In favor of WC_Discounts->is_coupon_valid.
+	 * @deprecated 3.2.0 In favor of WC_Discounts->is_coupon_valid.
 	 * @return bool
 	 */
 	public function is_valid() {
@@ -856,7 +922,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	 * @return bool
 	 */
 	public function is_valid_for_product( $product, $values = array() ) {
-		if ( ! $this->is_type( wc_get_product_coupon_types() ) ) {
+		if ( ! $this->is_type( wc_get_product_coupon_types() ) || ! is_a( $product, WC_Product::class ) ) {
 			return apply_filters( 'woocommerce_coupon_is_valid_for_product', false, $product, $this, $values );
 		}
 
@@ -901,20 +967,27 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	 * Converts one of the WC_Coupon message/error codes to a message string and.
 	 * displays the message/error.
 	 *
-	 * @param int $msg_code Message/error code.
+	 * @param int    $msg_code Message/error code.
+	 * @param string $notice_type Notice type.
 	 */
-	public function add_coupon_message( $msg_code ) {
-		$msg = $msg_code < 200 ? $this->get_coupon_error( $msg_code ) : $this->get_coupon_message( $msg_code );
+	public function add_coupon_message( $msg_code, $notice_type = 'success' ) {
+		if ( $msg_code < 200 ) {
+			$msg         = $this->get_coupon_error( $msg_code );
+			$notice_type = 'error';
+		} else {
+			$msg = $this->get_coupon_message( $msg_code );
+		}
 
-		if ( ! $msg ) {
+		if ( empty( $msg ) ) {
 			return;
 		}
 
-		if ( $msg_code < 200 ) {
-			wc_add_notice( $msg, 'error' );
-		} else {
-			wc_add_notice( $msg );
+		// Since coupon validation is done multiple times (e.g. to ensure a valid cart), we need to check for dupes.
+		if ( wc_has_notice( $msg, $notice_type ) ) {
+			return;
 		}
+
+		wc_add_notice( $msg, $notice_type );
 	}
 
 	/**
@@ -942,7 +1015,7 @@ class WC_Coupon extends WC_Legacy_Coupon {
 	 * Map one of the WC_Coupon error codes to a message string.
 	 *
 	 * @param int $err_code Message/error code.
-	 * @return string| Message/error string
+	 * @return string Message/error string
 	 */
 	public function get_coupon_error( $err_code ) {
 		switch ( $err_code ) {
@@ -951,22 +1024,29 @@ class WC_Coupon extends WC_Legacy_Coupon {
 				break;
 			case self::E_WC_COUPON_NOT_EXIST:
 				/* translators: %s: coupon code */
-				$err = sprintf( __( 'Coupon "%s" does not exist!', 'classic-commerce' ), $this->get_code() );
+				$err = sprintf( __( 'Coupon "%s" does not exist!', 'classic-commerce' ), esc_html( $this->get_code() ) );
 				break;
 			case self::E_WC_COUPON_INVALID_REMOVED:
 				/* translators: %s: coupon code */
-				$err = sprintf( __( 'Sorry, it seems the coupon "%s" is invalid - it has now been removed from your order.', 'classic-commerce' ), $this->get_code() );
+				$err = sprintf( __( 'Sorry, it seems the coupon "%s" is invalid - it has now been removed from your order.', 'classic-commerce' ), esc_html( $this->get_code() ) );
 				break;
 			case self::E_WC_COUPON_NOT_YOURS_REMOVED:
-				/* translators: %s: coupon code */
-				$err = sprintf( __( 'Sorry, it seems the coupon "%s" is not yours - it has now been removed from your order.', 'classic-commerce' ), $this->get_code() );
+				// We check for supplied billing email. On shortcode, this will be present for checkout requests.
+				$billing_email = \Automattic\WooCommerce\Utilities\ArrayUtil::get_value_or_default( $_POST, 'billing_email' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				if ( ! is_null( $billing_email ) ) {
+					/* translators: %s: coupon code */
+					$err = sprintf( __( 'Please enter a valid email to use coupon code "%s".', 'classic-commerce' ), esc_html( $this->get_code() ) );
+				} else {
+					/* translators: %s: coupon code */
+					$err = sprintf( __( 'Please enter a valid email at checkout to use coupon code "%s".', 'classic-commerce' ), esc_html( $this->get_code() ) );
+				}
 				break;
 			case self::E_WC_COUPON_ALREADY_APPLIED:
 				$err = __( 'Coupon code already applied!', 'classic-commerce' );
 				break;
 			case self::E_WC_COUPON_ALREADY_APPLIED_INDIV_USE_ONLY:
 				/* translators: %s: coupon code */
-				$err = sprintf( __( 'Sorry, coupon "%s" has already been applied and cannot be used in conjunction with other coupons.', 'classic-commerce' ), $this->get_code() );
+				$err = sprintf( __( 'Sorry, coupon "%s" has already been applied and cannot be used in conjunction with other coupons.', 'classic-commerce' ), esc_html( $this->get_code() ) );
 				break;
 			case self::E_WC_COUPON_USAGE_LIMIT_REACHED:
 				$err = __( 'Coupon usage limit has been reached.', 'classic-commerce' );
@@ -984,6 +1064,17 @@ class WC_Coupon extends WC_Legacy_Coupon {
 				break;
 			case self::E_WC_COUPON_NOT_APPLICABLE:
 				$err = __( 'Sorry, this coupon is not applicable to your cart contents.', 'classic-commerce' );
+				break;
+			case self::E_WC_COUPON_USAGE_LIMIT_COUPON_STUCK:
+				if ( is_user_logged_in() && wc_get_page_id( 'myaccount' ) > 0 ) {
+					/* translators: %s: myaccount page link. */
+					$err = sprintf( __( 'Coupon usage limit has been reached. If you were using this coupon just now but your order was not complete, you can retry or cancel the order by going to the <a href="%s">my account page</a>.', 'classic-commerce' ), wc_get_endpoint_url( 'orders', '', wc_get_page_permalink( 'myaccount' ) ) );
+				} else {
+					$err = $this->get_coupon_error( self::E_WC_COUPON_USAGE_LIMIT_REACHED );
+				}
+				break;
+			case self::E_WC_COUPON_USAGE_LIMIT_COUPON_STUCK_GUEST:
+				$err = __( 'Coupon usage limit has been reached. Please try again after some time, or contact us for help.', 'classic-commerce' );
 				break;
 			case self::E_WC_COUPON_EXCLUDED_PRODUCTS:
 				// Store excluded products that are in cart in $products.
@@ -1051,5 +1142,73 @@ class WC_Coupon extends WC_Legacy_Coupon {
 		}
 		// When using this static method, there is no $this to pass to filter.
 		return apply_filters( 'woocommerce_coupon_error', $err, $err_code, null );
+	}
+
+	/**
+	 * Get the coupon information that is needed to reapply the coupon to an existing order.
+	 * This information is intended to be stored as a meta value in the order line item corresponding to the coupon
+	 * and should NOT be modified or extended (additional/custom data should go in a separate metadata entry).
+	 *
+	 * The information returned is a JSON-encoded string of an array with the following coupon information:
+	 *
+	 * 0: Id
+	 * 1: Code
+	 * 2: Type, null is equivalent to 'fixed_cart'
+	 * 3: Nominal amount (either a fixed amount or a percent, depending on the coupon type)
+	 * 4: The coupon grants free shipping? (present only if true)
+	 *
+	 * @return string A JSON string with information that allows the coupon to be reapplied to an existing order.
+	 */
+	public function get_short_info(): string {
+		$type = $this->get_discount_type();
+		$info = array(
+			$this->get_id(),
+			$this->get_code(),
+			'fixed_cart' === $type ? null : $type,
+			(float) $this->get_prop( 'amount' ),
+		);
+
+		if ( $this->get_free_shipping() ) {
+			$info[] = true;
+		}
+
+		return wp_json_encode( $info );
+	}
+
+	/**
+	 * Sets the coupon parameters from a reapply information set generated with 'get_short_info'.
+	 *
+	 * @param string $info JSON string with reapply information as returned by 'get_short_info'.
+	 */
+	public function set_short_info( string $info ) {
+		$info = json_decode( $info, true );
+
+		$this->set_id( $info[0] ?? 0 );
+		$this->set_code( $info[1] ?? '' );
+		$this->set_discount_type( $info[2] ?? 'fixed_cart' );
+		$this->set_amount( $info[3] ?? 0 );
+		$this->set_free_shipping( $info[4] ?? false );
+	}
+
+	/**
+	 * Returns alternate error messages based on context (eg. Cart and Checkout).
+	 *
+	 * @param int $err_code Message/error code.
+	 *
+	 * @return array Context based alternate error messages.
+	 */
+	public function get_context_based_coupon_errors( $err_code = null ) {
+
+		switch ( $err_code ) {
+			case self::E_WC_COUPON_NOT_YOURS_REMOVED:
+				return array(
+					/* translators: %s: coupon code */
+					'cart'     => sprintf( __( 'Please enter a valid email at checkout to use coupon code "%s".', 'classic-commerce' ), esc_html( $this->get_code() ) ),
+					/* translators: %s: coupon code */
+					'checkout' => sprintf( __( 'Please enter a valid email to use coupon code "%s".', 'classic-commerce' ), esc_html( $this->get_code() ) ),
+				);
+			default:
+				return array();
+		}
 	}
 }

@@ -6,10 +6,6 @@
  * @package ClassicCommerce/Interface
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * WC Shipping Zone Data Store Interface.
  *

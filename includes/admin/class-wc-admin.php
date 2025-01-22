@@ -31,6 +31,9 @@ class WC_Admin {
 		add_action( 'admin_footer', 'wc_print_js', 25 );
 		add_filter( 'admin_footer_text', array( $this, 'admin_footer_text' ), 1 );
 
+		// Disable WXR export of schedule action posts.
+		add_filter( 'action_scheduler_post_type_args', array( $this, 'disable_webhook_post_export' ) );
+
 		// Add body class for WP 5.3+ compatibility.
 		add_filter( 'admin_body_class', array( $this, 'include_admin_body_class' ), 9999 );
 
@@ -47,42 +50,44 @@ class WC_Admin {
 	 * Include any classes we need within admin.
 	 */
 	public function includes() {
-		include_once dirname( __FILE__ ) . '/wc-admin-functions.php';
-		include_once dirname( __FILE__ ) . '/wc-meta-box-functions.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-post-types.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-taxonomies.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-menus.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-customize.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-notices.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-assets.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-api-keys.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-webhooks.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-pointers.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-importers.php';
-		include_once dirname( __FILE__ ) . '/class-wc-admin-exporters.php';
+		include_once __DIR__ . '/wc-admin-functions.php';
+		include_once __DIR__ . '/wc-meta-box-functions.php';
+		include_once __DIR__ . '/class-wc-admin-post-types.php';
+		include_once __DIR__ . '/class-wc-admin-taxonomies.php';
+		include_once __DIR__ . '/class-wc-admin-menus.php';
+		include_once __DIR__ . '/class-wc-admin-customize.php';
+		include_once __DIR__ . '/class-wc-admin-notices.php';
+		include_once __DIR__ . '/class-wc-admin-assets.php';
+		include_once __DIR__ . '/class-wc-admin-api-keys.php';
+		include_once __DIR__ . '/class-wc-admin-webhooks.php';
+		include_once __DIR__ . '/class-wc-admin-pointers.php';
+		include_once __DIR__ . '/class-wc-admin-importers.php';
+		include_once __DIR__ . '/class-wc-admin-exporters.php';
 
 		// Help Tabs
 		if ( apply_filters( 'woocommerce_enable_admin_help_tab', true ) ) {
-			include_once dirname( __FILE__ ) . '/class-wc-admin-help.php';
+			include_once __DIR__ . '/class-wc-admin-help.php';
 		}
 
 		// Setup/welcome
-		if ( ! empty( $_GET['page'] ) ) {
-			switch ( $_GET['page'] ) {
+		if ( ! empty( $_GET['page'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.NoNonceVerification
+			switch ( $_GET['page'] ) { // phpcs:ignore WordPress.Security.NonceVerification.NoNonceVerification
 				case 'wc-setup':
-					include_once dirname( __FILE__ ) . '/class-wc-admin-setup-wizard.php';
+					include_once __DIR__ . '/class-wc-admin-setup-wizard.php';
 					break;
 			}
 		}
 
-		// Importers
-		if ( defined( 'WP_LOAD_IMPORTERS' ) ) {
-			include_once dirname( __FILE__ ) . '/class-wc-admin-importers.php';
-		}
-
 		// Helper
-		include_once dirname( __FILE__ ) . '/helper/class-wc-helper-options.php';
-		include_once dirname( __FILE__ ) . '/helper/class-wc-helper.php';
+		include_once __DIR__ . '/helper/class-wc-helper-options.php';
+		include_once __DIR__ . '/helper/class-wc-helper.php';
+	}
+
+    /**
+	 * Preloads some functionality of the Helper to be loaded on the `plugins_loaded` hook
+	 */
+	public function preload_helper() {
+		include_once __DIR__ . '/helper/class-wc-helper-file-headers.php';
 	}
 
 	/**
@@ -96,22 +101,22 @@ class WC_Admin {
 		switch ( $screen->id ) {
 			case 'dashboard':
 			case 'dashboard-network':
-				include 'class-wc-admin-dashboard.php';
+				include __DIR__ . '/class-wc-admin-dashboard.php';
 				break;
 			case 'options-permalink':
-				include 'class-wc-admin-permalink-settings.php';
+				include __DIR__ . '/class-wc-admin-permalink-settings.php';
 				break;
 			case 'plugins':
-				include 'plugin-updates/class-wc-plugins-screen-updates.php';
+				include __DIR__ . '/plugin-updates/class-wc-plugins-screen-updates.php';
 				break;
 			case 'update-core':
-				include 'plugin-updates/class-wc-updates-screen-updates.php';
+				include __DIR__ . '/plugin-updates/class-wc-updates-screen-updates.php';
 				break;
 			case 'users':
 			case 'user':
 			case 'profile':
 			case 'user-edit':
-				include 'class-wc-admin-profile.php';
+				include __DIR__ . '/class-wc-admin-profile.php';
 				break;
 		}
 	}
@@ -122,11 +127,18 @@ class WC_Admin {
 	 * For setup wizard, transient must be present, the user must have access rights, and we must ignore the network/bulk plugin updaters.
 	 */
 	public function admin_redirects() {
-		// Nonced plugin install redirects (whitelisted)
+		// Don't run this fn from Action Scheduler requests, as it would clear _wc_activation_redirect transient.
+		// That means OBW would never be shown.
+		if ( wc_is_running_from_async_action_scheduler() ) {
+			return;
+		}
+		
+        // phpcs:disable WordPress.Security.NonceVerification.NoNonceVerification
+		// Nonced plugin install redirects (whitelisted).
 		if ( ! empty( $_GET['wc-install-plugin-redirect'] ) ) {
-			$plugin_slug = wc_clean( $_GET['wc-install-plugin-redirect'] );
+			$plugin_slug = wc_clean( wp_unslash( $_GET['wc-install-plugin-redirect'] ) );
 
-			if ( current_user_can( 'install_plugins' ) && in_array( $plugin_slug, array( 'woocommerce-gateway-stripe' ) ) ) {
+			if ( current_user_can( 'install_plugins' ) && in_array( $plugin_slug, array( 'woocommerce-gateway-stripe' ), true ) ) {
 				$nonce = wp_create_nonce( 'install-plugin_' . $plugin_slug );
 				$url   = self_admin_url( 'update.php?action=install-plugin&plugin=' . $plugin_slug . '&_wpnonce=' . $nonce );
 			} else {
@@ -137,16 +149,24 @@ class WC_Admin {
 			exit;
 		}
 
-		// Setup wizard redirect
-		if ( get_transient( '_wc_activation_redirect' ) ) {
-			delete_transient( '_wc_activation_redirect' );
+		// Setup wizard redirect.
+		if ( get_transient( '_wc_activation_redirect' ) && apply_filters( 'woocommerce_enable_setup_wizard', true ) ) {
+			$do_redirect  = true;
+			$current_page = isset( $_GET['page'] ) ? wc_clean( wp_unslash( $_GET['page'] ) ) : false;
 
-			if ( ( ! empty( $_GET['page'] ) && in_array( $_GET['page'], array( 'wc-setup' ) ) ) || is_network_admin() || isset( $_GET['activate-multi'] ) || ! current_user_can( 'manage_woocommerce' ) || apply_filters( 'woocommerce_prevent_automatic_wizard_redirect', false ) ) {
-				return;
+			// On these pages, or during these events, postpone the redirect.
+			if ( wp_doing_ajax() || is_network_admin() || ! current_user_can( 'manage_woocommerce' ) ) {
+				$do_redirect = false;
 			}
 
-			// If the user needs to install, send them to the setup wizard
-			if ( WC_Admin_Notices::has_notice( 'install' ) ) {
+			// On these pages, or during these events, disable the redirect.
+			if ( 'wc-setup' === $current_page || ! WC_Admin_Notices::has_notice( 'install' ) || apply_filters( 'woocommerce_prevent_automatic_wizard_redirect', false ) || isset( $_GET['activate-multi'] ) ) {
+				delete_transient( '_wc_activation_redirect' );
+				$do_redirect = false;
+			}
+
+			if ( $do_redirect ) {
+				delete_transient( '_wc_activation_redirect' );
 				wp_safe_redirect( admin_url( 'index.php?page=wc-setup' ) );
 				exit;
 			}
@@ -159,7 +179,7 @@ class WC_Admin {
 	public function prevent_admin_access() {
 		$prevent_access = false;
 
-		if ( apply_filters( 'woocommerce_disable_admin_bar', true ) && ! is_ajax() && isset( $_SERVER['SCRIPT_FILENAME'] ) && basename( sanitize_text_field( wp_unslash( $_SERVER['SCRIPT_FILENAME'] ) ) ) !== 'admin-post.php' ) {
+		if ( apply_filters( 'woocommerce_disable_admin_bar', true ) && ! wp_doing_ajax() && isset( $_SERVER['SCRIPT_FILENAME'] ) && basename( sanitize_text_field( wp_unslash( $_SERVER['SCRIPT_FILENAME'] ) ) ) !== 'admin-post.php' ) {
 			$has_cap     = false;
 			$access_caps = array( 'edit_posts', 'manage_woocommerce', 'view_admin_dashboard' );
 
@@ -199,7 +219,7 @@ class WC_Admin {
 
 			// get the preview email content
 			ob_start();
-			include 'views/html-email-template-preview.php';
+			include __DIR__ . '/views/html-email-template-preview.php';
 			$message = ob_get_clean();
 
 			// create a new email
@@ -232,14 +252,14 @@ class WC_Admin {
 		$wc_pages = array_diff( $wc_pages, array( 'profile', 'user-edit' ) );
 
 		// Check to make sure we're on a Classic Commerce admin page.
-		if ( isset( $current_screen->id ) && apply_filters( 'woocommerce_display_admin_footer_text', in_array( $current_screen->id, $wc_pages ) ) ) {
+		if ( isset( $current_screen->id ) && apply_filters( 'woocommerce_display_admin_footer_text', in_array( $current_screen->id, $wc_pages, true ) ) ) {
 				$footer_text = __( 'Thank you for using Classic Commerce.', 'classic-commerce' );
 		}
 
 		return $footer_text;
 	}
 
-	/**
+/**
 	 * Include admin classes.
 	 *
 	 * @since 4.2.0
@@ -247,7 +267,7 @@ class WC_Admin {
 	 * @return string
 	 */
 	public function include_admin_body_class( $classes ) {
-		if ( false !== strpos( $classes, 'wc-wp-version-gte-53' ) ) {
+		if ( in_array( array( 'wc-wp-version-gte-53', 'wc-wp-version-gte-55' ), explode( ' ', $classes ), true ) ) {
 			return $classes;
 		}
 
@@ -268,6 +288,20 @@ class WC_Admin {
 		return $classes;
 	}
 
+    /**
+	 * Disable WXR export of scheduled action posts.
+	 *
+	 * @since 3.6.2
+	 *
+	 * @param array $args Scehduled action post type registration args.
+	 *
+	 * @return array
+	 */
+	public function disable_webhook_post_export( $args ) {
+		$args['can_export'] = false;
+		return $args;
+	}
+	
 }
 
 return new WC_Admin();

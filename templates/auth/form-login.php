@@ -6,7 +6,7 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates/Auth
- * @version WC-3.4.0
+ * @version WC-9.2.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -31,12 +31,12 @@ do_action( 'woocommerce_auth_page_header' ); ?>
 
 <form method="post" class="wc-auth-login">
 	<p class="form-row form-row-wide">
-		<label for="username"><?php esc_html_e( 'Username or email address', 'classic-commerce' ); ?>&nbsp;<span class="required">*</span></label>
-		<input type="text" class="input-text" name="username" id="username" value="<?php echo ( ! empty( $_POST['username'] ) ) ? esc_attr( $_POST['username'] ) : ''; ?>" /><?php //@codingStandardsIgnoreLine ?>
+		<label for="username"><?php esc_html_e( 'Username or email address', 'classic-commerce' ); ?>&nbsp;<span class="required" aria-hidden="true">*</span><span class="screen-reader-text"><?php esc_html_e( 'Required', 'classic-commerce' ); ?></span></label>
+		<input type="text" class="input-text" name="username" id="username" value="<?php echo ( ! empty( $_POST['username'] ) ) ? esc_attr( $_POST['username'] ) : ''; ?>" required aria-required="true" /><?php //@codingStandardsIgnoreLine ?>
 	</p>
 	<p class="form-row form-row-wide">
-		<label for="password"><?php esc_html_e( 'Password', 'classic-commerce' ); ?>&nbsp;<span class="required">*</span></label>
-		<input class="input-text" type="password" name="password" id="password" />
+		<label for="password"><?php esc_html_e( 'Password', 'classic-commerce' ); ?>&nbsp;<span class="required" aria-hidden="true">*</span><span class="screen-reader-text"><?php esc_html_e( 'Required', 'classic-commerce' ); ?></span></label>
+		<input class="input-text" type="password" name="password" id="password" required aria-required="true" />
 	</p>
 	<p class="wc-auth-actions">
 		<?php wp_nonce_field( 'woocommerce-login', 'woocommerce-login-nonce' ); ?>

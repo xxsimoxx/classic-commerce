@@ -1,11 +1,11 @@
 <?php
 /**
- * Classic Commerce Legacy API. Was deprecated with WC-2.6.0.
+ * WooCommerce Legacy API. Was deprecated with 2.6.0.
  *
  * @author   WooThemes
  * @category API
- * @package  ClassicCommerce/API
- * @since    WC-2.6
+ * @package  ClassicCommerce\RestApi
+ * @since    2.6
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -21,40 +21,38 @@ class WC_Legacy_API {
 	 * This is the major version for the REST API and takes
 	 * first-order position in endpoint URLs.
 	 *
-	 * @deprecated WC-2.6.0
-	 * @var        string
+	 * @deprecated 2.6.0
+	 * @var string
 	 */
 	const VERSION = '3.1.0';
 
 	/**
 	 * The REST API server.
 	 *
-	 * @deprecated WC-2.6.0
-	 * @var        WC_API_Server
+	 * @deprecated 2.6.0
+	 * @var WC_API_Server
 	 */
 	public $server;
 
 	/**
 	 * REST API authentication class instance.
 	 *
-	 * @deprecated WC-2.6.0
-	 * @var        WC_API_Authentication
+	 * @deprecated 2.6.0
+	 * @var WC_API_Authentication
 	 */
 	public $authentication;
 
 	/**
-	 * Setup class.
-	 *
-	 * @since WC-2.0
+	 * Init the legacy API.
 	 */
-	public function __construct() {
+	public function init() {
 		add_action( 'parse_request', array( $this, 'handle_rest_api_requests' ), 0 );
 	}
 
 	/**
 	 * Add new query vars.
 	 *
-	 * @since WC-2.0
+	 * @since 2.0
 	 * @param array $vars Vars.
 	 * @return string[]
 	 */
@@ -67,10 +65,10 @@ class WC_Legacy_API {
 	/**
 	 * Add new endpoints.
 	 *
-	 * @since WC-2.0
+	 * @since 2.0
 	 */
 	public static function add_endpoint() {
-		// REST API, deprecated since WC-2.6.0.
+		// REST API, deprecated since 2.6.0.
 		add_rewrite_rule( '^wc-api/v([1-3]{1})/?$', 'index.php?wc-api-version=$matches[1]&wc-api-route=/', 'top' );
 		add_rewrite_rule( '^wc-api/v([1-3]{1})(.*)?', 'index.php?wc-api-version=$matches[1]&wc-api-route=$matches[2]', 'top' );
 	}
@@ -78,8 +76,8 @@ class WC_Legacy_API {
 	/**
 	 * Handle REST API requests.
 	 *
-	 * @since      WC-2.2
-	 * @deprecated WC-2.6.0
+	 * @since 2.2
+	 * @deprecated 2.6.0
 	 */
 	public function handle_rest_api_requests() {
 		global $wp;
@@ -122,29 +120,29 @@ class WC_Legacy_API {
 	/**
 	 * Include required files for REST API request.
 	 *
-	 * @since      WC-2.1
-	 * @deprecated WC-2.6.0
+	 * @since 2.1
+	 * @deprecated 2.6.0
 	 */
 	public function includes() {
 
 		// API server / response handlers.
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-exception.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-server.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/interface-wc-api-handler.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-json-handler.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-exception.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-server.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/interface-wc-api-handler.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-json-handler.php' );
 
 		// Authentication.
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-authentication.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-authentication.php' );
 		$this->authentication = new WC_API_Authentication();
 
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-resource.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-coupons.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-customers.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-orders.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-products.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-reports.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-taxes.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v3/class-wc-api-webhooks.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-resource.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-coupons.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-customers.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-orders.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-products.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-reports.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-taxes.php' );
+		include_once( dirname( __FILE__ ) . '/api/v3/class-wc-api-webhooks.php' );
 
 		// Allow plugins to load other response handlers or resource classes.
 		do_action( 'woocommerce_api_loaded' );
@@ -153,9 +151,9 @@ class WC_Legacy_API {
 	/**
 	 * Register available API resources.
 	 *
-	 * @since      WC-2.1
-	 * @deprecated WC-2.6.0
-	 * @param      WC_API_Server $server the REST server.
+	 * @since 2.1
+	 * @deprecated 2.6.0
+	 * @param WC_API_Server $server the REST server.
 	 */
 	public function register_resources( $server ) {
 
@@ -180,26 +178,26 @@ class WC_Legacy_API {
 	/**
 	 * Handle legacy v1 REST API requests.
 	 *
-	 * @since      WC-2.2
-	 * @deprecated WC-2.6.0
+	 * @since 2.2
+	 * @deprecated 2.6.0
 	 */
 	private function handle_v1_rest_api_request() {
 
 		// Include legacy required files for v1 REST API request.
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-server.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/interface-wc-api-handler.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-json-handler.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-xml-handler.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-server.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/interface-wc-api-handler.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-json-handler.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-xml-handler.php' );
 
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-authentication.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-authentication.php' );
 		$this->authentication = new WC_API_Authentication();
 
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-resource.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-coupons.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-customers.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-orders.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-products.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v1/class-wc-api-reports.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-resource.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-coupons.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-customers.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-orders.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-products.php' );
+		include_once( dirname( __FILE__ ) . '/api/v1/class-wc-api-reports.php' );
 
 		// Allow plugins to load other response handlers or resource classes.
 		do_action( 'woocommerce_api_loaded' );
@@ -228,25 +226,25 @@ class WC_Legacy_API {
 	/**
 	 * Handle legacy v2 REST API requests.
 	 *
-	 * @since      WC-2.4
-	 * @deprecated WC-2.6.0
+	 * @since 2.4
+	 * @deprecated 2.6.0
 	 */
 	private function handle_v2_rest_api_request() {
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-exception.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-server.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/interface-wc-api-handler.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-json-handler.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-exception.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-server.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/interface-wc-api-handler.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-json-handler.php' );
 
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-authentication.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-authentication.php' );
 		$this->authentication = new WC_API_Authentication();
 
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-resource.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-coupons.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-customers.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-orders.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-products.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-reports.php' );
-		include_once( dirname( __FILE__ ) . '/../api/legacy/v2/class-wc-api-webhooks.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-resource.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-coupons.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-customers.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-orders.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-products.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-reports.php' );
+		include_once( dirname( __FILE__ ) . '/api/v2/class-wc-api-webhooks.php' );
 
 		// allow plugins to load other response handlers or resource classes.
 		do_action( 'woocommerce_api_loaded' );

@@ -4,8 +4,8 @@
  *
  * Handles requests to the /products/<product_id>/variations endpoints.
  *
- * @package ClassicCommerce\API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API variations controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Products_V2_Controller
  */
 class WC_REST_Product_Variations_V2_Controller extends WC_REST_Products_V2_Controller {
@@ -38,14 +38,6 @@ class WC_REST_Product_Variations_V2_Controller extends WC_REST_Products_V2_Contr
 	 * @var string
 	 */
 	protected $post_type = 'product_variation';
-
-	/**
-	 * Initialize product actions (parent).
-	 */
-	public function __construct() {
-		add_filter( "woocommerce_rest_{$this->post_type}_query", array( $this, 'add_product_id' ), 9, 2 );
-		parent::__construct();
-	}
 
 	/**
 	 * Register the routes for products.
@@ -141,12 +133,50 @@ class WC_REST_Product_Variations_V2_Controller extends WC_REST_Products_V2_Contr
 	/**
 	 * Get object.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  int $id Object ID.
-	 * @return WC_Data
+	 * @return WC_Data|null
 	 */
 	protected function get_object( $id ) {
-		return wc_get_product( $id );
+		$object = wc_get_product( $id );
+		return ( $object && 0 !== $object->get_parent_id() ) ? $object : null;
+	}
+
+	/**
+	 * Checks that a variation belongs to the specified parent product.
+	 *
+	 * @param int $variation_id Variation ID.
+	 * @param int $parent_id    Parent product ID to check against.
+	 * @return bool TRUE if variation and parent product exist. FALSE otherwise.
+	 *
+	 * @since 9.2.0
+	 */
+	protected function check_variation_parent( int $variation_id, int $parent_id ): bool {
+		$variation = $this->get_object( $variation_id );
+		if ( ! $variation || $parent_id !== $variation->get_parent_id() ) {
+			return false;
+		}
+
+		$parent = wc_get_product( $variation->get_parent_id() );
+		if ( ! $parent ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Check if a given request has access to read an item.
+	 *
+	 * @param  WP_REST_Request $request Full details about the request.
+	 * @return WP_Error|boolean
+	 */
+	public function get_item_permissions_check( $request ) {
+		if ( ! $this->check_variation_parent( (int) $request['id'], (int) $request['product_id'] ) ) {
+			return new WP_Error( "woocommerce_rest_{$this->post_type}_invalid_id", __( 'Invalid ID.', 'classic-commerce' ), array( 'status' => 404 ) );
+		}
+
+		return parent::get_item_permissions_check( $request );
 	}
 
 	/**
@@ -156,24 +186,37 @@ class WC_REST_Product_Variations_V2_Controller extends WC_REST_Products_V2_Contr
 	 * @return WP_Error|boolean
 	 */
 	public function update_item_permissions_check( $request ) {
+        		if ( ! $this->check_variation_parent( (int) $request['id'], (int) $request['product_id'] ) ) {
+			return new WP_Error( "woocommerce_rest_{$this->post_type}_invalid_id", __( 'Invalid ID.', 'classic-commerce' ), array( 'status' => 404 ) );
+		}
+
 		$object = $this->get_object( (int) $request['id'] );
 
 		if ( $object && 0 !== $object->get_id() && ! wc_rest_check_post_permissions( $this->post_type, 'edit', $object->get_id() ) ) {
 			return new WP_Error( 'woocommerce_rest_cannot_edit', __( 'Sorry, you are not allowed to edit this resource.', 'classic-commerce' ), array( 'status' => rest_authorization_required_code() ) );
 		}
 
-		// Check if variation belongs to the correct parent product.
-		if ( $object && 0 !== $object->get_parent_id() && absint( $request['product_id'] ) !== $object->get_parent_id() ) {
-			return new WP_Error( 'woocommerce_rest_cannot_edit', __( 'Parent product does not match current variation.', 'classic-commerce' ), array( 'status' => rest_authorization_required_code() ) );
+		return true;
+	}
+
+	/**
+	 * Check if a given request has access to delete an item.
+	 *
+	 * @param  WP_REST_Request $request Full details about the request.
+	 * @return bool|WP_Error
+	 */
+	public function delete_item_permissions_check( $request ) {
+		if ( ! $this->check_variation_parent( (int) $request['id'], (int) $request['product_id'] ) ) {
+			return new WP_Error( "woocommerce_rest_{$this->post_type}_invalid_id", __( 'Invalid ID.', 'classic-commerce' ), array( 'status' => 404 ) );
 		}
 
-		return true;
+		return parent::delete_item_permissions_check( $request );
 	}
 
 	/**
 	 * Prepare a single variation output for response.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WC_Data         $object  Object data.
 	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response
@@ -247,7 +290,7 @@ class WC_REST_Product_Variations_V2_Controller extends WC_REST_Products_V2_Contr
 	/**
 	 * Prepare objects query.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WP_REST_Request $request Full details about the request.
 	 * @return array
 	 */
@@ -586,13 +629,14 @@ class WC_REST_Product_Variations_V2_Controller extends WC_REST_Products_V2_Contr
 	/**
 	 * Bulk create, update and delete items.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param WP_REST_Request $request Full details about the request.
 	 * @return array Of WP_Error or WP_REST_Response.
 	 */
 	public function batch_items( $request ) {
 		$items       = array_filter( $request->get_params() );
 		$params      = $request->get_url_params();
+		$query       = $request->get_query_params();
 		$product_id  = $params['product_id'];
 		$body_params = array();
 
@@ -612,6 +656,7 @@ class WC_REST_Product_Variations_V2_Controller extends WC_REST_Products_V2_Contr
 
 		$request = new WP_REST_Request( $request->get_method() );
 		$request->set_body_params( $body_params );
+		$request->set_query_params( $query );
 
 		return parent::batch_items( $request );
 	}

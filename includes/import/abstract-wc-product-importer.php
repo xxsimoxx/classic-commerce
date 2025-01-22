@@ -120,7 +120,13 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 	 * @return array
 	 */
 	public function get_parsed_data() {
-		return apply_filters( 'woocommerce_product_importer_parsed_data', $this->parsed_data, $this->get_raw_data() );
+		/**
+		 * Filter product importer parsed data.
+		 *
+		 * @param array $parsed_data Parsed data.
+		 * @param WC_Product_Importer $importer Importer instance.
+		 */
+		return apply_filters( 'woocommerce_product_importer_parsed_data', $this->parsed_data, $this );
 	}
 
 	/**
@@ -152,7 +158,7 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 			return 0;
 		}
 
-		return absint( min( round( ( $this->file_position / $size ) * 100 ), 100 ) );
+		return absint( min( floor( ( $this->file_position / $size ) * 100 ), 100 ) );
 	}
 
 	/**
@@ -166,10 +172,7 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 
 		// Type is the most important part here because we need to be using the correct class and methods.
 		if ( isset( $data['type'] ) ) {
-			$types   = array_keys( wc_get_product_types() );
-			$types[] = 'variation';
-
-			if ( ! in_array( $data['type'], $types, true ) ) {
+			if ( ! array_key_exists( $data['type'], WC_Admin_Exporters::get_product_types() ) ) {
 				return new WP_Error( 'woocommerce_product_importer_invalid_type', __( 'Invalid product type.', 'classic-commerce' ), array( 'status' => 401 ) );
 			}
 
@@ -211,6 +214,7 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 	protected function process_item( $data ) {
 		try {
 			do_action( 'woocommerce_product_import_before_process_item', $data );
+			$data = apply_filters( 'woocommerce_product_import_process_item_data', $data );
 
 			// Get product ID from SKU if created during the importation.
 			if ( empty( $data['id'] ) && ! empty( $data['sku'] ) ) {
@@ -234,6 +238,13 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 
 			if ( 'external' === $object->get_type() ) {
 				unset( $data['manage_stock'], $data['stock_status'], $data['backorders'], $data['low_stock_amount'] );
+			}
+			$is_variation = false;
+			if ( 'variation' === $object->get_type() ) {
+				if ( isset( $data['status'] ) && -1 === $data['status'] ) {
+					$data['status'] = 0; // Variations cannot be drafts - set to private.
+				}
+				$is_variation = true;
 			}
 
 			if ( 'importing' === $object->get_status() ) {
@@ -262,8 +273,9 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 			do_action( 'woocommerce_product_import_inserted_product_object', $object, $data );
 
 			return array(
-				'id'      => $object->get_id(),
-				'updated' => $updating,
+				'id'           => $object->get_id(),
+				'updated'      => $updating,
+				'is_variation' => $is_variation,
 			);
 		} catch ( Exception $e ) {
 			return new WP_Error( 'woocommerce_product_importer_error', $e->getMessage(), array( 'status' => $e->getCode() ) );
@@ -644,13 +656,15 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 		}
 
 		// If the attribute does not exist, create it.
-		$attribute_id = wc_create_attribute( array(
-			'name'         => $raw_name,
-			'slug'         => $attribute_name,
-			'type'         => 'select',
-			'order_by'     => 'menu_order',
-			'has_archives' => false,
-		) );
+		$attribute_id = wc_create_attribute(
+			array(
+				'name'         => $raw_name,
+				'slug'         => $attribute_name,
+				'type'         => 'select',
+				'order_by'     => 'menu_order',
+				'has_archives' => false,
+			)
+		);
 
 		if ( is_wp_error( $attribute_id ) ) {
 			throw new Exception( $attribute_id->get_error_message(), 400 );
@@ -661,15 +675,18 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 		register_taxonomy(
 			$taxonomy_name,
 			apply_filters( 'woocommerce_taxonomy_objects_' . $taxonomy_name, array( 'product' ) ),
-			apply_filters( 'woocommerce_taxonomy_args_' . $taxonomy_name, array(
-				'labels'       => array(
-					'name' => $raw_name,
-				),
-				'hierarchical' => true,
-				'show_ui'      => false,
-				'query_var'    => true,
-				'rewrite'      => false,
-			) )
+			apply_filters(
+				'woocommerce_taxonomy_args_' . $taxonomy_name,
+				array(
+					'labels'       => array(
+						'name' => $raw_name,
+					),
+					'hierarchical' => true,
+					'show_ui'      => false,
+					'query_var'    => true,
+					'rewrite'      => false,
+				)
+			)
 		);
 
 		// Set product attributes global.
@@ -717,7 +734,7 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 			// Unlimited, set to 32GB.
 			$memory_limit = '32000M';
 		}
-		return intval( $memory_limit ) * 1024 * 1024;
+		return wp_convert_hr_to_bytes( $memory_limit );
 	}
 
 	/**
@@ -765,21 +782,20 @@ abstract class WC_Product_Importer implements WC_Importer_Interface {
 	}
 
 	/**
-	 * The exporter prepends a ' to fields that start with a - which causes
-	 * issues with negative numbers. This removes the ' if the input is still a valid
-	 * number after removal.
+	 * The exporter prepends a ' to escape fields that start with =, +, - or @.
+	 * Remove the prepended ' character preceding those characters.
 	 *
-	 * @since WC-3.3.0
-	 * @param string $value A numeric string that may or may not have ' prepended.
+	 * @since WC-3.5.2
+	 * @param string $value A string that may or may not have been escaped with '.
 	 * @return string
 	 */
-	protected function unescape_negative_number( $value ) {
-		if ( 0 === strpos( $value, "'-" ) ) {
-			$unescaped = trim( $value, "'" );
-			if ( is_numeric( $unescaped ) ) {
-				return $unescaped;
-			}
+	protected function unescape_data( $value ) {
+		$active_content_triggers = array( "'=", "'+", "'-", "'@" );
+
+		if ( in_array( mb_substr( $value, 0, 2 ), $active_content_triggers, true ) ) {
+			$value = mb_substr( $value, 1 );
 		}
+        
 		return $value;
 	}
 }

@@ -4,8 +4,8 @@
  *
  * Handles requests to the /orders/<order_id>/notes endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Order Notes controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Order_Notes_V1_Controller
  */
 class WC_REST_Order_Notes_V2_Controller extends WC_REST_Order_Notes_V1_Controller {

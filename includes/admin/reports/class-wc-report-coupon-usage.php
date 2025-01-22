@@ -330,25 +330,25 @@ class WC_Report_Coupon_Usage extends WC_Admin_Report {
 			</table>
 		</div>
 		<script type="text/javascript">
-			jQuery('.section_title').click(function(){
-				var next_section = jQuery(this).next('.section');
+			jQuery( '.section_title' ).on( 'click', function() {
+				var next_section = jQuery( this ).next( '.section' );
 
-				if ( jQuery(next_section).is(':visible') )
+				if ( jQuery( next_section ).is( ':visible' ) )
 					return false;
 
-				jQuery('.section:visible').slideUp();
-				jQuery('.section_title').removeClass('open');
-				jQuery(this).addClass('open').next('.section').slideDown();
+				jQuery( '.section:visible' ).slideUp();
+				jQuery( '.section_title' ).removeClass( 'open' );
+				jQuery( this ).addClass( 'open' ).next( '.section' ).slideDown();
 
 				return false;
-			});
-			jQuery('.section').slideUp( 100, function() {
+			} );
+			jQuery( '.section' ).slideUp( 100, function() {
 				<?php if ( empty( $this->coupon_codes ) ) : ?>
-					jQuery('.section_title:eq(1)').click();
+					jQuery( '.section_title:eq(1)' ).trigger( 'click' );
 				<?php else : ?>
-					jQuery('.section_title:eq(0)').click();
+					jQuery( '.section_title:eq(0)' ).trigger( 'click' );
 				<?php endif; ?>
-			});
+			} );
 		</script>
 		<?php
 	}
@@ -552,15 +552,15 @@ class WC_Report_Coupon_Usage extends WC_Admin_Report {
 						}
 					);
 
-					jQuery('.chart-placeholder').resize();
+					jQuery('.chart-placeholder').trigger( 'resize' );
 				}
 
 				drawGraph();
 
-				jQuery('.highlight_series').hover(
+				jQuery('.highlight_series').on( 'mouseenter',
 					function() {
 						drawGraph( jQuery(this).data('series') );
-					},
+					} ).on( 'mouseleave',
 					function() {
 						drawGraph();
 					}

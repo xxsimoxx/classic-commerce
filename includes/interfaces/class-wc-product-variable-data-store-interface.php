@@ -6,10 +6,6 @@
  * @package ClassicCommerce/Interface
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * WC Product Variable Data Store Interface
  *

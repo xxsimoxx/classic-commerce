@@ -98,10 +98,10 @@ class WC_CLI_Runner {
 	 * Generates command information and tells WP CLI about all
 	 * commands available from a route.
 	 *
-	 * @param string $rest_command WC-API command.
-	 * @param string $route Path to route endpoint.
-	 * @param array  $route_data Command data.
-	 * @param array  $command_args WP-CLI command arguments.
+	 * @param WC_CLI_REST_Command $rest_command WC-API command.
+	 * @param string              $route Path to route endpoint.
+	 * @param array               $route_data Command data.
+	 * @param array               $command_args WP-CLI command arguments.
 	 */
 	private static function register_route_commands( $rest_command, $route, $route_data, $command_args = array() ) {
 		// Define IDs that we are looking for in the routes (in addition to id)
@@ -113,11 +113,12 @@ class WC_CLI_Runner {
 			'refund_id'    => __( 'Refund ID.', 'classic-commerce' ),
 			'attribute_id' => __( 'Attribute ID.', 'classic-commerce' ),
 			'zone_id'      => __( 'Zone ID.', 'classic-commerce' ),
-			'id'           => __( 'ID.', 'classic-commerce' ),
+			'instance_id'  => __( 'Instance ID.', 'classic-commerce' ),
+			'id'           => __( 'The ID for the resource.', 'classic-commerce' ),
+            'slug'         => __( 'The slug for the resource.', 'classic-commerce' ),
 		);
 		$rest_command->set_supported_ids( $supported_ids );
 		$positional_args = array_keys( $supported_ids );
-
 		$parent             = "wc {$route_data['schema']['title']}";
 		$supported_commands = array();
 
@@ -165,14 +166,6 @@ class WC_CLI_Runner {
 					);
 					$ids[]      = $id_name;
 				}
-			}
-			if ( in_array( $command, array( 'delete', 'get', 'update' ), true ) && ! in_array( 'id', $ids, true ) ) {
-				$synopsis[] = array(
-					'name'        => 'id',
-					'type'        => 'positional',
-					'description' => __( 'The id for the resource.', 'classic-commerce' ),
-					'optional'    => false,
-				);
 			}
 
 			foreach ( $endpoint_args as $name => $args ) {

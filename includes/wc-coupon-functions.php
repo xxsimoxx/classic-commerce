@@ -10,6 +10,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
+use ClassicCommerce\Utilities\StringUtil;
+
 /**
  * Get coupon types.
  *
@@ -81,7 +83,7 @@ function wc_get_coupon_code_by_id( $id ) {
 }
 
 /**
- * Get coupon code by ID.
+ * Get coupon ID by code.
  *
  * @since  WC-3.0.0
  * @param  string $code    Coupon code.
@@ -89,6 +91,11 @@ function wc_get_coupon_code_by_id( $id ) {
  * @return int
  */
 function wc_get_coupon_id_by_code( $code, $exclude = 0 ) {
+
+    if ( StringUtil::is_null_or_whitespace( $code ) ) {
+		return 0;
+	}
+    
 	$data_store = WC_Data_Store::load( 'coupon' );
 	$ids        = wp_cache_get( WC_Cache_Helper::get_cache_prefix( 'coupons' ) . 'coupon_id_from_code_' . $code, 'coupons' );
 

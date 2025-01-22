@@ -30,8 +30,8 @@ class WC_Post_Data {
 		add_action( 'shutdown', array( __CLASS__, 'do_deferred_product_sync' ), 10 );
 		add_action( 'set_object_terms', array( __CLASS__, 'set_object_terms' ), 10, 6 );
 		add_action( 'set_object_terms', array( __CLASS__, 'force_default_term' ), 10, 5 );
-
 		add_action( 'transition_post_status', array( __CLASS__, 'transition_post_status' ), 10, 3 );
+        add_action( 'deleted_term_relationships', array( __CLASS__, 'delete_product_query_transients' ) );
 		add_action( 'woocommerce_product_set_stock_status', array( __CLASS__, 'delete_product_query_transients' ) );
 		add_action( 'woocommerce_product_set_visibility', array( __CLASS__, 'delete_product_query_transients' ) );
 		add_action( 'woocommerce_product_type_changed', array( __CLASS__, 'product_type_changed' ), 10, 3 );
@@ -42,6 +42,7 @@ class WC_Post_Data {
 		add_filter( 'update_post_metadata', array( __CLASS__, 'update_post_metadata' ), 10, 5 );
 		add_filter( 'wp_insert_post_data', array( __CLASS__, 'wp_insert_post_data' ) );
 		add_filter( 'oembed_response_data', array( __CLASS__, 'filter_oembed_response_data' ), 10, 2 );
+        add_filter( 'wp_untrash_post_status', array( __CLASS__, 'wp_untrash_post_status' ), 10, 3 );
 
 		// Status transitions.
 		add_action( 'delete_post', array( __CLASS__, 'delete_post' ) );
@@ -51,6 +52,8 @@ class WC_Post_Data {
 
 		// Meta cache flushing.
 		add_action( 'updated_post_meta', array( __CLASS__, 'flush_object_meta_cache' ), 10, 4 );
+		add_action( 'added_post_meta', array( __CLASS__, 'flush_object_meta_cache' ), 10, 4 );
+		add_action( 'deleted_post_meta', array( __CLASS__, 'flush_object_meta_cache' ), 10, 4 );
 		add_action( 'updated_order_item_meta', array( __CLASS__, 'flush_object_meta_cache' ), 10, 4 );
 	}
 
@@ -162,10 +165,20 @@ class WC_Post_Data {
 	 * @param string     $to      New type.
 	 */
 	public static function product_type_changed( $product, $from, $to ) {
-		if ( 'variable' === $from && 'variable' !== $to ) {
+		/**
+		 * Filter to prevent variations from being deleted while switching from a variable product type to a variable product type.
+		 *
+		 * @since 4.9.0
+		 *
+		 * @param bool       A boolean value of true will delete the variations.
+		 * @param WC_Product $product Product data.
+		 * @return string    $from    Origin type.
+         * @param string     $to      New type.
+		 */
+		if ( apply_filters( 'woocommerce_delete_variations_on_product_type_change', 'variable' === $from && 'variable' !== $to, $product, $from, $to ) ) {
 			// If the product is no longer variable, we should ensure all variations are removed.
 			$data_store = WC_Data_Store::load( 'product-variable' );
-			$data_store->delete_variations( $product->get_id() );
+			$data_store->delete_variations( $product->get_id(), true );
 		}
 	}
 
@@ -199,6 +212,14 @@ class WC_Post_Data {
 				global $wpdb;
 
 				$wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->postmeta} SET meta_value = %s WHERE meta_key = %s AND meta_value = %s;", $edited_term->slug, 'attribute_' . sanitize_title( $taxonomy ), self::$editing_term->slug ) );
+
+                $wpdb->query(
+					$wpdb->prepare(
+						"UPDATE {$wpdb->postmeta} SET meta_value = REPLACE( meta_value, %s, %s ) WHERE meta_key = '_default_attributes'",
+						serialize( self::$editing_term->taxonomy ) . serialize( self::$editing_term->slug ),
+						serialize( $edited_term->taxonomy ) . serialize( $edited_term->slug )
+					)
+				);
 			}
 		} else {
 			self::$editing_term = null;
@@ -293,6 +314,9 @@ class WC_Post_Data {
 			}
 		} elseif ( 'product' === $data['post_type'] && 'auto-draft' === $data['post_status'] ) {
 			$data['post_title'] = 'AUTO-DRAFT';
+            } elseif ( 'shop_coupon' === $data['post_type'] ) {
+			// Coupons should never allow unfiltered HTML.
+			$data['post_title'] = wp_filter_kses( $data['post_title'] );
 		}
 
 		return $data;
@@ -438,8 +462,9 @@ class WC_Post_Data {
 					$customer->save();
 				}
 
-				// Delete order count meta.
+				// Delete order count and last order meta.
 				delete_user_meta( $customer_id, '_order_count' );
+                delete_user_meta( $customer_id, '_last_order' );
 			}
 
 			// Clean up items.
@@ -509,7 +534,7 @@ class WC_Post_Data {
 	 * @param  string $meta_value Meta value.
 	 */
 	public static function flush_object_meta_cache( $meta_id, $object_id, $meta_key, $meta_value ) {
-		WC_Cache_Helper::incr_cache_prefix( 'object_' . $object_id );
+		WC_Cache_Helper::invalidate_cache_group( 'object_' . $object_id );
 	}
 
 	/**
@@ -531,6 +556,24 @@ class WC_Post_Data {
 				wp_set_post_terms( $object_id, array( $default_term ), 'product_cat', true );
 			}
 		}
+	}
+
+    /**
+	 * Ensure statuses are correctly reassigned when restoring orders and products.
+	 *
+	 * @param string $new_status      The new status of the post being restored.
+	 * @param int    $post_id         The ID of the post being restored.
+	 * @param string $previous_status The status of the post at the point where it was trashed.
+	 * @return string
+	 */
+	public static function wp_untrash_post_status( $new_status, $post_id, $previous_status ) {
+		$post_types = array( 'shop_order', 'shop_coupon', 'product', 'product_variation' );
+
+		if ( in_array( get_post_type( $post_id ), $post_types, true ) ) {
+			$new_status = $previous_status;
+		}
+
+		return $new_status;
 	}
 }
 

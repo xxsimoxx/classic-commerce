@@ -6,7 +6,7 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates/Emails
- * @version WC-3.5.0
+ * @version WC-3.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -22,7 +22,7 @@ do_action( 'woocommerce_email_header', $email_heading, $email ); ?>
 <p><?php printf( esc_html__( 'Hi %s,', 'classic-commerce' ), esc_html( $order->get_billing_first_name() ) ); ?></p>
 <p><?php esc_html_e( 'The following note has been added to your order:', 'classic-commerce' ); ?></p>
 
-<blockquote><?php echo wpautop( wptexturize( $customer_note ) ); ?></blockquote><?php // phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped ?>
+<blockquote><?php echo wpautop( wptexturize( make_clickable( $customer_note ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></blockquote>
 
 <p><?php esc_html_e( 'As a reminder, here are your order details:', 'classic-commerce' ); ?></p>
 
@@ -47,9 +47,12 @@ do_action( 'woocommerce_email_order_meta', $order, $sent_to_admin, $plain_text, 
  */
 do_action( 'woocommerce_email_customer_details', $order, $sent_to_admin, $plain_text, $email );
 
-?>
-<p><?php esc_html_e( 'Thanks for reading.', 'classic-commerce' ); ?></p>
-<?php
+/**
+ * Show user-defined additonal content - this is set in each email's settings.
+ */
+if ( $additional_content ) {
+	echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) );
+}
 
 /*
  * @hooked WC_Emails::email_footer() Output the email footer

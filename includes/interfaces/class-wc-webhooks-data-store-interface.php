@@ -6,10 +6,6 @@
  * @package  ClassicCommerce/Interface
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * Classic Commerce Webhook data store interface.
  */
@@ -30,5 +26,5 @@ interface WC_Webhook_Data_Store_Interface {
 	 * @since  WC-3.2.0
 	 * @return int[]
 	 */
-	public function get_webhooks_ids();
+	public function get_webhooks_ids( $status = '' );
 }

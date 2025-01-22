@@ -9,7 +9,7 @@
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @author  WooThemes
  * @package ClassicCommerce/Templates
- * @version WC-3.2.0
+ * @version WC-7.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -30,12 +30,10 @@ do_action( 'woocommerce_before_account_downloads', $has_downloads ); ?>
 	<?php do_action( 'woocommerce_after_available_downloads' ); ?>
 
 <?php else : ?>
-	<div class="woocommerce-Message woocommerce-Message--info woocommerce-info">
-		<a class="woocommerce-Button button" href="<?php echo esc_url( apply_filters( 'woocommerce_return_to_shop_redirect', wc_get_page_permalink( 'shop' ) ) ); ?>">
-			<?php esc_html_e( 'Go shop', 'classic-commerce' ) ?>
-		</a>
-		<?php esc_html_e( 'No downloads available yet.', 'classic-commerce' ); ?>
-	</div>
+	<?php
+
+	wc_print_notice( esc_html__( 'No downloads available yet.', 'classic-commerce' ) . ' <a class="button wc-forward" href="' . esc_url( apply_filters( 'woocommerce_return_to_shop_redirect', wc_get_page_permalink( 'shop' ) ) ) . '">' . esc_html__( 'Browse products', 'classic-commerce' ) . '</a>', 'notice' ); // phpcs:ignore WooCommerce.Commenting.CommentHooks.MissingHookComment 
+	?>
 <?php endif; ?>
 
 <?php do_action( 'woocommerce_after_account_downloads', $has_downloads ); ?>

@@ -70,6 +70,13 @@ abstract class WC_CSV_Exporter {
 	 * @var array
 	 */
 	protected $columns_to_export = array();
+    
+    /**
+	 * The delimiter parameter sets the field delimiter (one character only).
+	 *
+	 * @var string
+	 */
+	protected $delimiter = ',';
 
 	/**
 	 * Prepare data that will be exported.
@@ -108,6 +115,16 @@ abstract class WC_CSV_Exporter {
 	 */
 	public function get_columns_to_export() {
 		return $this->columns_to_export;
+	}
+
+    /**
+	 * Return the delimiter to use in CSV file
+	 *
+	 * @since 3.9.0
+	 * @return string
+	 */
+	public function get_delimiter() {
+		return apply_filters( "woocommerce_{$this->export_type}_export_delimiter", $this->delimiter );
 	}
 
 	/**
@@ -343,7 +360,7 @@ abstract class WC_CSV_Exporter {
 	 * Additionally, Excel exposes the ability to launch arbitrary commands through
 	 * the DDE protocol.
 	 *
-	 * @see http://www.contextis.com/resources/blog/comma-separated-vulnerabilities/
+	 * @see https://owasp.org/www-community/attacks/CSV_Injection
 	 * @see https://hackerone.com/reports/72785
 	 *
 	 * @since WC-3.1.0
@@ -351,10 +368,12 @@ abstract class WC_CSV_Exporter {
 	 * @return string
 	 */
 	public function escape_data( $data ) {
-		$active_content_triggers = array( '=', '+', '-', '@' );
+		// 0x09: Tab (\t)
+		// 0x0d: Carriage Return (\r)
+		$active_content_triggers = array( '=', '+', '-', '@', chr( 0x09 ), chr( 0x0d ) );
 
 		if ( in_array( mb_substr( $data, 0, 1 ), $active_content_triggers, true ) ) {
-			$data = "'" . $data . "'";
+			$data = "'" . $data;
 		}
 
 		return $data;
@@ -381,8 +400,10 @@ abstract class WC_CSV_Exporter {
 		$use_mb = function_exists( 'mb_convert_encoding' );
 
 		if ( $use_mb ) {
-			$encoding = mb_detect_encoding( $data, 'UTF-8, ISO-8859-1', true );
-			$data     = 'UTF-8' === $encoding ? $data : utf8_encode( $data );
+            $is_valid_utf_8 = mb_check_encoding( $data, 'UTF-8' );
+			if ( ! $is_valid_utf_8 ) {
+				$data = mb_convert_encoding( $data, 'UTF-8', 'ISO-8859-1' );
+			}
 		}
 
 		return $this->escape_data( $data );
@@ -450,7 +471,7 @@ abstract class WC_CSV_Exporter {
 		$values_to_implode = array();
 
 		foreach ( $values as $value ) {
-			$value               = (string) is_scalar( $value ) ? $value : '';
+			$value               = (string) is_scalar( $value ) ? html_entity_decode( $value, ENT_QUOTES ) : '';
 			$values_to_implode[] = str_replace( ',', '\\,', $value );
 		}
 
@@ -458,30 +479,14 @@ abstract class WC_CSV_Exporter {
 	}
 
 	/**
-	 * Write to the CSV file, ensuring escaping works across versions of
-	 * PHP.
+	 * Write to the CSV file.
 	 *
-	 * PHP 5.5.4 uses '\' as the default escape character. This is not RFC-4180 compliant.
-	 * \0 disables the escape character.
 	 *
-	 * @see https://bugs.php.net/bug.php?id=43225
-	 * @see https://bugs.php.net/bug.php?id=50686
-	 * @see https://github.com/woocommerce/woocommerce/issues/19514
 	 * @since WC-3.4.0
-	 * @param resource $buffer Resource we are writing to.
+     * @param resource $buffer Resource we are writing to.
 	 * @param array    $export_row Row to export.
 	 */
 	protected function fputcsv( $buffer, $export_row ) {
-		if ( version_compare( PHP_VERSION, '5.5.4', '<' ) ) {
-			ob_start();
-			$temp = fopen( 'php://output', 'w' ); // @codingStandardsIgnoreLine
-    		fputcsv( $temp, $export_row, ",", '"' ); // @codingStandardsIgnoreLine
-			fclose( $temp ); // @codingStandardsIgnoreLine
-			$row = ob_get_clean();
-			$row = str_replace( '\\"', '\\""', $row );
-			fwrite( $buffer, $row ); // @codingStandardsIgnoreLine
-		} else {
-			fputcsv( $buffer, $export_row, ",", '"', "\0" ); // @codingStandardsIgnoreLine
-		}
+		fputcsv( $buffer, $export_row, $this->get_delimiter(), '"', "\0" ); // @codingStandardsIgnoreLine
 	}
 }

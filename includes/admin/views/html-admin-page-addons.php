@@ -20,36 +20,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<h3 id="cc-compat"><?php esc_html_e( 'Important Note:', 'classic-commerce' ); ?></h3>
 
-	<p><?php esc_html_e( 'Although Classic Commerce is a fork of WooCommerce version 3.5.3, all JetPack and WooCommerce Services integration have been removed.', 'classic-commerce' ); ?></p>
+	<p><?php esc_html_e( 'Although Classic Commerce is a fork of WooCommerce version 9.4, all JetPack and WooCommerce Services integration, and anything related to blocks , FSE and Woocommerce Admin have been removed.', 'classic-commerce' ); ?></p>
 
-	<p><?php esc_html_e( 'Many extensions or plugins designed for WooCommerce will still work with Classic Commerce provided they do not rely on Jetpack or WooCommerce Services.', 'classic-commerce' ); ?></p>
+	<p><?php esc_html_e( 'Many extensions or plugins designed for WooCommerce will still work with Classic Commerce provided they do not rely on Jetpack or WooCommerce Services, blocks, FSE or Woocommerce Admin.', 'classic-commerce' ); ?></p>
 
 	<hr />
 	
-	<h3 id="cc-compat"><?php esc_html_e( 'Classic Commerce Compatibility Plugin', 'classic-commerce' ); ?></h3>
-
-	<p><?php esc_html_e( 'This is an optional plugin that is seperately installed and activated. Its primary purpose is to ensure Classic Commerce compatibility with extensions that are dependent on the installation of WooCommerce.', 'classic-commerce' ); ?></p>
-	
-	<p><?php printf( __( 'The compatibility plugin can be downloaded by clicking <strong><a href="%s" target="_blank" rel="noopener">here</a></strong>. Save to your hard drive.', 'classic-commerce' ), 'https://classiccommerce.cc/docs/cc-compatibility-for-woo-addons-plugin/' ); ?></p>
-	
-	<p><?php printf( __( 'To install, <strong>first, delete WooCommerce</strong> (after making a backup first if needed). The compatibility plugin and WooCommerce cannot co-exist.', 'classic-commerce' ) ); ?></p>
-	
-	<p><?php printf( __( 'Then <strong>install the compatibility plugin</strong> the same way as you would install any other plugin and activate it.', 'classic-commerce' ) ); ?></p>
-	
-	<p><?php printf( __( 'That\'s it. Other plugins will now think that WooCommerce is still installed.', 'classic-commerce' ) ); ?></p>
-
-	<p><?php printf( __( '<strong>Note:</strong> The Compatibility plugin does not fix all compatibility issues apart from specific checks the extensions run to detect WooCommerce installation.', 'classic-commerce' ) ); ?></p>
-
-	<p><?php printf( __( '<strong>Sample checks include:</strong>', 'classic-commerce' ) ); ?></p>
-
-	<p><code>in_array( 'woocommerce/woocommerce.php', self::$active_plugins ) || array_key_exists( 'woocommerce/woocommerce.php', self::$active_plugins );</code></p>
-
-	<p><code>in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) );</code></p>
-
-	<p><code>is_plugin_active( 'woocommerce/woocommerce.php' )</code></p>
-	
-	<hr />
-
 	<h3><?php esc_html_e( 'Disclaimer', 'classic-commerce' ); ?></h3>
 
 	<p><?php printf( __( '<strong>The end user is entirely responsible</strong> for choosing, installing, testing and monitoring any extensions or plugins that are needed to provide extra functionality to the Classic Commerce core.', 'classic-commerce' ) ); ?></p>

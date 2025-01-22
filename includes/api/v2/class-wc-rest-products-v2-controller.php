@@ -4,8 +4,8 @@
  *
  * Handles requests to the /products endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,10 +13,10 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Products controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_CRUD_Controller
  */
-class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller {
+class WC_REST_Products_V2_Controller extends WC_REST_CRUD_Controller {
 
 	/**
 	 * Endpoint namespace.
@@ -58,7 +58,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 */
 	public function register_routes() {
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base, array(
+			$this->namespace,
+			'/' . $this->rest_base,
+			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
 					'callback'            => array( $this, 'get_items' ),
@@ -76,7 +78,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 		);
 
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base . '/(?P<id>[\d]+)', array(
+			$this->namespace,
+			'/' . $this->rest_base . '/(?P<id>[\d]+)',
+			array(
 				'args'   => array(
 					'id' => array(
 						'description' => __( 'Unique identifier for the resource.', 'classic-commerce' ),
@@ -118,7 +122,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 		);
 
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base . '/batch', array(
+			$this->namespace,
+			'/' . $this->rest_base . '/batch',
+			array(
 				array(
 					'methods'             => WP_REST_Server::EDITABLE,
 					'callback'            => array( $this, 'batch_items' ),
@@ -133,8 +139,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	/**
 	 * Get object.
 	 *
-	 * @since  WC-3.0.0
-	 * @param  int $id Object ID.
+	 * @param int $id Object ID.
+	 *
+	 * @since  3.0.0
 	 * @return WC_Data
 	 */
 	protected function get_object( $id ) {
@@ -144,14 +151,16 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	/**
 	 * Prepare a single product output for response.
 	 *
-	 * @since  WC-3.0.0
-	 * @param  WC_Data         $object  Object data.
-	 * @param  WP_REST_Request $request Request object.
+	 * @param WC_Data         $object  Object data.
+	 * @param WP_REST_Request $request Request object.
+	 *
+	 * @since  3.0.0
 	 * @return WP_REST_Response
 	 */
 	public function prepare_object_for_response( $object, $request ) {
-		$context = ! empty( $request['context'] ) ? $request['context'] : 'view';
-		$data    = $this->get_product_data( $object, $context );
+		$context       = ! empty( $request['context'] ) ? $request['context'] : 'view';
+		$this->request = $request;
+		$data          = $this->get_product_data( $object, $context, $request );
 
 		// Add variations to variable products.
 		if ( $object->is_type( 'variable' ) && $object->has_child() ) {
@@ -184,8 +193,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	/**
 	 * Prepare objects query.
 	 *
-	 * @since  WC-3.0.0
-	 * @param  WP_REST_Request $request Full details about the request.
+	 * @param WP_REST_Request $request Full details about the request.
+	 *
+	 * @since  3.0.0
 	 * @return array
 	 */
 	protected function prepare_objects_query( $request ) {
@@ -259,7 +269,8 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 			}
 
 			$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
-				$args, array(
+				$args,
+				array(
 					'key'     => '_sku',
 					'value'   => $skus,
 					'compare' => 'IN',
@@ -270,7 +281,8 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 		// Filter by tax class.
 		if ( ! empty( $request['tax_class'] ) ) {
 			$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
-				$args, array(
+				$args,
+				array(
 					'key'   => '_tax_class',
 					'value' => 'standard' !== $request['tax_class'] ? $request['tax_class'] : '',
 				)
@@ -285,7 +297,8 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 		// Filter product in stock or out of stock.
 		if ( is_bool( $request['in_stock'] ) ) {
 			$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
-				$args, array(
+				$args,
+				array(
 					'key'   => '_stock_status',
 					'value' => true === $request['in_stock'] ? 'instock' : 'outofstock',
 				)
@@ -317,6 +330,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 * Get the downloads for a product or product variation.
 	 *
 	 * @param WC_Product|WC_Product_Variation $product Product instance.
+	 *
 	 * @return array
 	 */
 	protected function get_downloads( $product ) {
@@ -340,6 +354,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 *
 	 * @param WC_Product $product  Product instance.
 	 * @param string     $taxonomy Taxonomy slug.
+	 *
 	 * @return array
 	 */
 	protected function get_taxonomy_terms( $product, $taxonomy = 'cat' ) {
@@ -360,6 +375,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 * Get the images for a product or product variation.
 	 *
 	 * @param WC_Product|WC_Product_Variation $product Product instance.
+	 *
 	 * @return array
 	 */
 	protected function get_images( $product ) {
@@ -404,9 +420,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 			$images[] = array(
 				'id'                => 0,
 				'date_created'      => wc_rest_prepare_date_response( current_time( 'mysql' ), false ), // Default to now.
-				'date_created_gmt'  => wc_rest_prepare_date_response( current_time( 'timestamp', true ) ), // Default to now.
+				'date_created_gmt'  => wc_rest_prepare_date_response( time() ), // Default to now.
 				'date_modified'     => wc_rest_prepare_date_response( current_time( 'mysql' ), false ),
-				'date_modified_gmt' => wc_rest_prepare_date_response( current_time( 'timestamp', true ) ),
+				'date_modified_gmt' => wc_rest_prepare_date_response( time() ),
 				'src'               => wc_placeholder_img_src(),
 				'name'              => __( 'Placeholder', 'classic-commerce' ),
 				'alt'               => __( 'Placeholder', 'classic-commerce' ),
@@ -420,10 +436,10 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	/**
 	 * Get attribute taxonomy label.
 	 *
-	 * @deprecated WC-3.0.0
+	 * @param string $name Taxonomy name.
 	 *
-	 * @param  string $name Taxonomy name.
-	 * @return string
+	 * @deprecated 3.0.0
+	 * @return     string
 	 */
 	protected function get_attribute_taxonomy_label( $name ) {
 		$tax    = get_taxonomy( $name );
@@ -435,19 +451,33 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	/**
 	 * Get product attribute taxonomy name.
 	 *
-	 * @since  WC-3.0.0
-	 * @param  string     $slug    Taxonomy name.
-	 * @param  WC_Product $product Product data.
+	 * @param string     $slug    Taxonomy name.
+	 * @param WC_Product $product Product data.
+	 *
+	 * @since  3.0.0
 	 * @return string
 	 */
 	protected function get_attribute_taxonomy_name( $slug, $product ) {
+		// Format slug so it matches attributes of the product.
+		$slug       = wc_attribute_taxonomy_slug( $slug );
 		$attributes = $product->get_attributes();
+		$attributes = array_combine(
+			array_map( 'wc_sanitize_taxonomy_name', array_keys( $product->get_attributes() ) ),
+			array_values( $product->get_attributes() )
+		);
 
-		if ( ! isset( $attributes[ $slug ] ) ) {
-			return str_replace( 'pa_', '', $slug );
+		$attribute = false;
+
+		// pa_ attributes.
+		if ( isset( $attributes[ wc_attribute_taxonomy_name( $slug ) ] ) ) {
+			$attribute = $attributes[ wc_attribute_taxonomy_name( $slug ) ];
+		} elseif ( isset( $attributes[ $slug ] ) ) {
+			$attribute = $attributes[ $slug ];
 		}
 
-		$attribute = $attributes[ $slug ];
+		if ( ! $attribute ) {
+			return $slug;
+		}
 
 		// Taxonomy attribute name.
 		if ( $attribute->is_taxonomy() ) {
@@ -463,6 +493,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 * Get default attributes.
 	 *
 	 * @param WC_Product $product Product instance.
+	 *
 	 * @return array
 	 */
 	protected function get_default_attributes( $product ) {
@@ -494,12 +525,15 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 *
 	 * @param int   $product_id Product ID.
 	 * @param array $attribute  Attribute data.
+	 *
 	 * @return array
 	 */
 	protected function get_attribute_options( $product_id, $attribute ) {
 		if ( isset( $attribute['is_taxonomy'] ) && $attribute['is_taxonomy'] ) {
 			return wc_get_product_terms(
-				$product_id, $attribute['name'], array(
+				$product_id,
+				$attribute['name'],
+				array(
 					'fields' => 'names',
 				)
 			);
@@ -514,6 +548,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 * Get the attributes for a product or product variation.
 	 *
 	 * @param WC_Product|WC_Product_Variation $product Product instance.
+	 *
 	 * @return array
 	 */
 	protected function get_attributes( $product ) {
@@ -524,7 +559,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 			foreach ( $product->get_variation_attributes() as $attribute_name => $attribute ) {
 				$name = str_replace( 'attribute_', '', $attribute_name );
 
-				if ( ! $attribute ) {
+				if ( empty( $attribute ) && '0' !== $attribute ) {
 					continue;
 				}
 
@@ -561,84 +596,266 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	}
 
 	/**
+	 * Fetch price HTML.
+	 *
+	 * @param WC_Product $product Product object.
+	 * @param string     $context Context of request, can be `view` or `edit`.
+	 *
+	 * @return string
+	 */
+	protected function api_get_price_html( $product, $context ) {
+		return $product->get_price_html();
+	}
+
+	/**
+	 * Fetch related IDs.
+	 *
+	 * @param WC_Product $product Product object.
+	 * @param string     $context Context of request, can be `view` or `edit`.
+	 *
+	 * @return array
+	 */
+	protected function api_get_related_ids( $product, $context ) {
+		return array_map( 'absint', array_values( wc_get_related_products( $product->get_id() ) ) );
+	}
+
+	/**
+	 * Fetch meta data.
+	 *
+	 * @param WC_Product $product Product object.
+	 * @param string     $context Context of request, can be `view` or `edit`.
+	 *
+	 * @return array
+	 */
+	protected function api_get_meta_data( $product, $context ) {
+		$meta_data = $product->get_meta_data();
+
+		if ( ! isset( $this->request ) || ! $this->request instanceof WP_REST_Request ) {
+			return $meta_data;
+		}
+
+		return $this->get_meta_data_for_response( $this->request, $meta_data );
+	}
+
+	/**
 	 * Get product data.
 	 *
 	 * @param WC_Product $product Product instance.
-	 * @param string     $context Request context.
-	 *                            Options: 'view' and 'edit'.
+	 * @param string     $context Request context. Options: 'view' and 'edit'.
+	 *
 	 * @return array
 	 */
 	protected function get_product_data( $product, $context = 'view' ) {
-		$data = array(
-			'id'                    => $product->get_id(),
-			'name'                  => $product->get_name( $context ),
-			'slug'                  => $product->get_slug( $context ),
-			'permalink'             => $product->get_permalink(),
-			'date_created'          => wc_rest_prepare_date_response( $product->get_date_created( $context ), false ),
-			'date_created_gmt'      => wc_rest_prepare_date_response( $product->get_date_created( $context ) ),
-			'date_modified'         => wc_rest_prepare_date_response( $product->get_date_modified( $context ), false ),
-			'date_modified_gmt'     => wc_rest_prepare_date_response( $product->get_date_modified( $context ) ),
-			'type'                  => $product->get_type(),
-			'status'                => $product->get_status( $context ),
-			'featured'              => $product->is_featured(),
-			'catalog_visibility'    => $product->get_catalog_visibility( $context ),
-			'description'           => 'view' === $context ? wpautop( do_shortcode( $product->get_description() ) ) : $product->get_description( $context ),
-			'short_description'     => 'view' === $context ? apply_filters( 'woocommerce_short_description', $product->get_short_description() ) : $product->get_short_description( $context ),
-			'sku'                   => $product->get_sku( $context ),
-			'price'                 => $product->get_price( $context ),
-			'regular_price'         => $product->get_regular_price( $context ),
-			'sale_price'            => $product->get_sale_price( $context ) ? $product->get_sale_price( $context ) : '',
-			'date_on_sale_from'     => wc_rest_prepare_date_response( $product->get_date_on_sale_from( $context ), false ),
-			'date_on_sale_from_gmt' => wc_rest_prepare_date_response( $product->get_date_on_sale_from( $context ) ),
-			'date_on_sale_to'       => wc_rest_prepare_date_response( $product->get_date_on_sale_to( $context ), false ),
-			'date_on_sale_to_gmt'   => wc_rest_prepare_date_response( $product->get_date_on_sale_to( $context ) ),
-			'price_html'            => $product->get_price_html(),
-			'on_sale'               => $product->is_on_sale( $context ),
-			'purchasable'           => $product->is_purchasable(),
-			'total_sales'           => $product->get_total_sales( $context ),
-			'virtual'               => $product->is_virtual(),
-			'downloadable'          => $product->is_downloadable(),
-			'downloads'             => $this->get_downloads( $product ),
-			'download_limit'        => $product->get_download_limit( $context ),
-			'download_expiry'       => $product->get_download_expiry( $context ),
-			'external_url'          => $product->is_type( 'external' ) ? $product->get_product_url( $context ) : '',
-			'button_text'           => $product->is_type( 'external' ) ? $product->get_button_text( $context ) : '',
-			'tax_status'            => $product->get_tax_status( $context ),
-			'tax_class'             => $product->get_tax_class( $context ),
-			'manage_stock'          => $product->managing_stock(),
-			'stock_quantity'        => $product->get_stock_quantity( $context ),
-			'in_stock'              => $product->is_in_stock(),
-			'backorders'            => $product->get_backorders( $context ),
-			'backorders_allowed'    => $product->backorders_allowed(),
-			'backordered'           => $product->is_on_backorder(),
-			'sold_individually'     => $product->is_sold_individually(),
-			'weight'                => $product->get_weight( $context ),
-			'dimensions'            => array(
-				'length' => $product->get_length( $context ),
-				'width'  => $product->get_width( $context ),
-				'height' => $product->get_height( $context ),
-			),
-			'shipping_required'     => $product->needs_shipping(),
-			'shipping_taxable'      => $product->is_shipping_taxable(),
-			'shipping_class'        => $product->get_shipping_class(),
-			'shipping_class_id'     => $product->get_shipping_class_id( $context ),
-			'reviews_allowed'       => $product->get_reviews_allowed( $context ),
-			'average_rating'        => 'view' === $context ? wc_format_decimal( $product->get_average_rating(), 2 ) : $product->get_average_rating( $context ),
-			'rating_count'          => $product->get_rating_count(),
-			'related_ids'           => array_map( 'absint', array_values( wc_get_related_products( $product->get_id() ) ) ),
-			'upsell_ids'            => array_map( 'absint', $product->get_upsell_ids( $context ) ),
-			'cross_sell_ids'        => array_map( 'absint', $product->get_cross_sell_ids( $context ) ),
-			'parent_id'             => $product->get_parent_id( $context ),
-			'purchase_note'         => 'view' === $context ? wpautop( do_shortcode( wp_kses_post( $product->get_purchase_note() ) ) ) : $product->get_purchase_note( $context ),
-			'categories'            => $this->get_taxonomy_terms( $product ),
-			'tags'                  => $this->get_taxonomy_terms( $product, 'tag' ),
-			'images'                => $this->get_images( $product ),
-			'attributes'            => $this->get_attributes( $product ),
-			'default_attributes'    => $this->get_default_attributes( $product ),
-			'variations'            => array(),
-			'grouped_products'      => array(),
-			'menu_order'            => $product->get_menu_order( $context ),
-			'meta_data'             => $product->get_meta_data(),
+		/*
+		 * @param WP_REST_Request $request Current request object. For backward compatibility, we pass this argument silently.
+		 *
+		 *  TODO: Refactor to fix this behavior when DI gets included to make it obvious and clean.
+		*/
+		$request = func_num_args() >= 3 ? func_get_arg( 2 ) : new WP_REST_Request( '', '', array( 'context' => $context ) );
+		$fields  = $this->get_fields_for_response( $request );
+
+		$base_data = array();
+		foreach ( $fields as $field ) {
+			switch ( $field ) {
+				case 'id':
+					$base_data['id'] = $product->get_id();
+					break;
+				case 'name':
+					$base_data['name'] = $product->get_name( $context );
+					break;
+				case 'slug':
+					$base_data['slug'] = $product->get_slug( $context );
+					break;
+				case 'permalink':
+					$base_data['permalink'] = $product->get_permalink();
+					break;
+				case 'date_created':
+					$base_data['date_created'] = wc_rest_prepare_date_response( $product->get_date_created( $context ), false );
+					break;
+				case 'date_created_gmt':
+					$base_data['date_created_gmt'] = wc_rest_prepare_date_response( $product->get_date_created( $context ) );
+					break;
+				case 'date_modified':
+					$base_data['date_modified'] = wc_rest_prepare_date_response( $product->get_date_modified( $context ), false );
+					break;
+				case 'date_modified_gmt':
+					$base_data['date_modified_gmt'] = wc_rest_prepare_date_response( $product->get_date_modified( $context ) );
+					break;
+				case 'type':
+					$base_data['type'] = $product->get_type();
+					break;
+				case 'status':
+					$base_data['status'] = $product->get_status( $context );
+					break;
+				case 'featured':
+					$base_data['featured'] = $product->is_featured();
+					break;
+				case 'catalog_visibility':
+					$base_data['catalog_visibility'] = $product->get_catalog_visibility( $context );
+					break;
+				case 'description':
+					$base_data['description'] = 'view' === $context ? wpautop( do_shortcode( $product->get_description() ) ) : $product->get_description( $context );
+					break;
+				case 'short_description':
+					$base_data['short_description'] = 'view' === $context ? apply_filters( 'woocommerce_short_description', $product->get_short_description() ) : $product->get_short_description( $context );
+					break;
+				case 'sku':
+					$base_data['sku'] = $product->get_sku( $context );
+					break;
+				case 'price':
+					$base_data['price'] = $product->get_price( $context );
+					break;
+				case 'regular_price':
+					$base_data['regular_price'] = $product->get_regular_price( $context );
+					break;
+				case 'sale_price':
+					$base_data['sale_price'] = $product->get_sale_price( $context ) ? $product->get_sale_price( $context ) : '';
+					break;
+				case 'date_on_sale_from':
+					$base_data['date_on_sale_from'] = wc_rest_prepare_date_response( $product->get_date_on_sale_from( $context ), false );
+					break;
+				case 'date_on_sale_from_gmt':
+					$base_data['date_on_sale_from_gmt'] = wc_rest_prepare_date_response( $product->get_date_on_sale_from( $context ) );
+					break;
+				case 'date_on_sale_to':
+					$base_data['date_on_sale_to'] = wc_rest_prepare_date_response( $product->get_date_on_sale_to( $context ), false );
+					break;
+				case 'date_on_sale_to_gmt':
+					$base_data['date_on_sale_to_gmt'] = wc_rest_prepare_date_response( $product->get_date_on_sale_to( $context ) );
+					break;
+				case 'on_sale':
+					$base_data['on_sale'] = $product->is_on_sale( $context );
+					break;
+				case 'purchasable':
+					$base_data['purchasable'] = $product->is_purchasable();
+					break;
+				case 'total_sales':
+					$base_data['total_sales'] = $product->get_total_sales( $context );
+					break;
+				case 'virtual':
+					$base_data['virtual'] = $product->is_virtual();
+					break;
+				case 'downloadable':
+					$base_data['downloadable'] = $product->is_downloadable();
+					break;
+				case 'downloads':
+					$base_data['downloads'] = $this->get_downloads( $product );
+					break;
+				case 'download_limit':
+					$base_data['download_limit'] = $product->get_download_limit( $context );
+					break;
+				case 'download_expiry':
+					$base_data['download_expiry'] = $product->get_download_expiry( $context );
+					break;
+				case 'external_url':
+					$base_data['external_url'] = $product->is_type( 'external' ) ? $product->get_product_url( $context ) : '';
+					break;
+				case 'button_text':
+					$base_data['button_text'] = $product->is_type( 'external' ) ? $product->get_button_text( $context ) : '';
+					break;
+				case 'tax_status':
+					$base_data['tax_status'] = $product->get_tax_status( $context );
+					break;
+				case 'tax_class':
+					$base_data['tax_class'] = $product->get_tax_class( $context );
+					break;
+				case 'manage_stock':
+					$base_data['manage_stock'] = $product->managing_stock();
+					break;
+				case 'stock_quantity':
+					$base_data['stock_quantity'] = $product->get_stock_quantity( $context );
+					break;
+				case 'in_stock':
+					$base_data['in_stock'] = $product->is_in_stock();
+					break;
+				case 'backorders':
+					$base_data['backorders'] = $product->get_backorders( $context );
+					break;
+				case 'backorders_allowed':
+					$base_data['backorders_allowed'] = $product->backorders_allowed();
+					break;
+				case 'backordered':
+					$base_data['backordered'] = $product->is_on_backorder();
+					break;
+				case 'low_stock_amount':
+					$base_data['low_stock_amount'] = '' === $product->get_low_stock_amount() ? null : $product->get_low_stock_amount();
+					break;
+				case 'sold_individually':
+					$base_data['sold_individually'] = $product->is_sold_individually();
+					break;
+				case 'weight':
+					$base_data['weight'] = $product->get_weight( $context );
+					break;
+				case 'dimensions':
+					$base_data['dimensions'] = array(
+						'length' => $product->get_length( $context ),
+						'width'  => $product->get_width( $context ),
+						'height' => $product->get_height( $context ),
+					);
+					break;
+				case 'shipping_required':
+					$base_data['shipping_required'] = $product->needs_shipping();
+					break;
+				case 'shipping_taxable':
+					$base_data['shipping_taxable'] = $product->is_shipping_taxable();
+					break;
+				case 'shipping_class':
+					$base_data['shipping_class'] = $product->get_shipping_class();
+					break;
+				case 'shipping_class_id':
+					$base_data['shipping_class_id'] = $product->get_shipping_class_id( $context );
+					break;
+				case 'reviews_allowed':
+					$base_data['reviews_allowed'] = $product->get_reviews_allowed( $context );
+					break;
+				case 'average_rating':
+					$base_data['average_rating'] = 'view' === $context ? wc_format_decimal( $product->get_average_rating(), 2 ) : $product->get_average_rating( $context );
+					break;
+				case 'rating_count':
+					$base_data['rating_count'] = $product->get_rating_count();
+					break;
+				case 'upsell_ids':
+					$base_data['upsell_ids'] = array_map( 'absint', $product->get_upsell_ids( $context ) );
+					break;
+				case 'cross_sell_ids':
+					$base_data['cross_sell_ids'] = array_map( 'absint', $product->get_cross_sell_ids( $context ) );
+					break;
+				case 'parent_id':
+					$base_data['parent_id'] = $product->get_parent_id( $context );
+					break;
+				case 'purchase_note':
+					$base_data['purchase_note'] = 'view' === $context ? wpautop( do_shortcode( wp_kses_post( $product->get_purchase_note() ) ) ) : $product->get_purchase_note( $context );
+					break;
+				case 'categories':
+					$base_data['categories'] = $this->get_taxonomy_terms( $product );
+					break;
+				case 'tags':
+					$base_data['tags'] = $this->get_taxonomy_terms( $product, 'tag' );
+					break;
+				case 'images':
+					$base_data['images'] = $this->get_images( $product );
+					break;
+				case 'attributes':
+					$base_data['attributes'] = $this->get_attributes( $product );
+					break;
+				case 'default_attributes':
+					$base_data['default_attributes'] = $this->get_default_attributes( $product );
+					break;
+				case 'variations':
+					$base_data['variations'] = array();
+					break;
+				case 'grouped_products':
+					$base_data['grouped_products'] = array();
+					break;
+				case 'menu_order':
+					$base_data['menu_order'] = $product->get_menu_order( $context );
+					break;
+			}
+		}
+
+		$data = array_merge(
+			$base_data,
+			$this->fetch_fields_using_getters( $product, $context, $fields )
 		);
 
 		return $data;
@@ -649,21 +866,22 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 *
 	 * @param WC_Data         $object  Object data.
 	 * @param WP_REST_Request $request Request object.
-	 * @return array                   Links for the given post.
+	 *
+	 * @return array Links for the given post.
 	 */
 	protected function prepare_links( $object, $request ) {
 		$links = array(
 			'self'       => array(
-				'href' => rest_url( sprintf( '/%s/%s/%d', $this->namespace, $this->rest_base, $object->get_id() ) ),
+				'href' => rest_url( sprintf( '/%s/%s/%d', $this->namespace, $this->rest_base, $object->get_id() ) ),  // @codingStandardsIgnoreLine.
 			),
 			'collection' => array(
-				'href' => rest_url( sprintf( '/%s/%s', $this->namespace, $this->rest_base ) ),
+				'href' => rest_url( sprintf( '/%s/%s', $this->namespace, $this->rest_base ) ),  // @codingStandardsIgnoreLine.
 			),
 		);
 
 		if ( $object->get_parent_id() ) {
 			$links['up'] = array(
-				'href' => rest_url( sprintf( '/%s/products/%d', $this->namespace, $object->get_parent_id() ) ),
+				'href' => rest_url( sprintf( '/%s/products/%d', $this->namespace, $object->get_parent_id() ) ),  // @codingStandardsIgnoreLine.
 			);
 		}
 
@@ -673,8 +891,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	/**
 	 * Prepare a single product for create or update.
 	 *
-	 * @param  WP_REST_Request $request Request object.
-	 * @param  bool            $creating If is creating a new object.
+	 * @param WP_REST_Request $request Request object.
+	 * @param bool            $creating If is creating a new object.
+	 *
 	 * @return WP_Error|WC_Data
 	 */
 	protected function prepare_object_for_database( $request, $creating = false ) {
@@ -697,7 +916,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 
 		if ( 'variation' === $product->get_type() ) {
 			return new WP_Error(
-				"woocommerce_rest_invalid_{$this->post_type}_id", __( 'To manipulate product variations you should use the /products/&lt;product_id&gt;/variations/&lt;id&gt; endpoint.', 'classic-commerce' ), array(
+				"woocommerce_rest_invalid_{$this->post_type}_id",
+				__( 'To manipulate product variations you should use the /products/&lt;product_id&gt;/variations/&lt;id&gt; endpoint.', 'classic-commerce' ),
+				array(
 					'status' => 404,
 				)
 			);
@@ -1055,9 +1276,10 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	/**
 	 * Set product images.
 	 *
-	 * @throws WC_REST_Exception REST API exceptions.
 	 * @param WC_Product $product Product instance.
 	 * @param array      $images  Images data.
+	 *
+	 * @throws WC_REST_Exception REST API exceptions.
 	 * @return WC_Product
 	 */
 	protected function set_product_images( $product, $images ) {
@@ -1136,6 +1358,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 *
 	 * @param WC_Product $product Product instance.
 	 * @param array      $data    Shipping data.
+	 *
 	 * @return WC_Product
 	 */
 	protected function save_product_shipping_data( $product, $data ) {
@@ -1182,6 +1405,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 * @param WC_Product $product    Product instance.
 	 * @param array      $downloads  Downloads data.
 	 * @param int        $deprecated Deprecated since 3.0.
+	 *
 	 * @return WC_Product
 	 */
 	protected function save_downloadable_files( $product, $downloads, $deprecated = 0 ) {
@@ -1212,6 +1436,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 * @param WC_Product $product  Product instance.
 	 * @param array      $terms    Terms data.
 	 * @param string     $taxonomy Taxonomy name.
+	 *
 	 * @return WC_Product
 	 */
 	protected function save_taxonomy_terms( $product, $terms, $taxonomy = 'cat' ) {
@@ -1229,10 +1454,10 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	/**
 	 * Save default attributes.
 	 *
-	 * @since WC-3.0.0
-	 *
 	 * @param WC_Product      $product Product instance.
 	 * @param WP_REST_Request $request Request data.
+	 *
+	 * @since  3.0.0
 	 * @return WC_Product
 	 */
 	protected function save_default_attributes( $product, $request ) {
@@ -1301,6 +1526,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	 * Delete a single item.
 	 *
 	 * @param WP_REST_Request $request Full details about the request.
+	 *
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function delete_item( $request ) {
@@ -1311,7 +1537,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 
 		if ( ! $object || 0 === $object->get_id() ) {
 			return new WP_Error(
-				"woocommerce_rest_{$this->post_type}_invalid_id", __( 'Invalid ID.', 'classic-commerce' ), array(
+				"woocommerce_rest_{$this->post_type}_invalid_id",
+				__( 'Invalid ID.', 'classic-commerce' ),
+				array(
 					'status' => 404,
 				)
 			);
@@ -1319,7 +1547,9 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 
 		if ( 'variation' === $object->get_type() ) {
 			return new WP_Error(
-				"woocommerce_rest_invalid_{$this->post_type}_id", __( 'To manipulate product variations you should use the /products/&lt;product_id&gt;/variations/&lt;id&gt; endpoint.', 'classic-commerce' ), array(
+				"woocommerce_rest_invalid_{$this->post_type}_id",
+				__( 'To manipulate product variations you should use the /products/&lt;product_id&gt;/variations/&lt;id&gt; endpoint.', 'classic-commerce' ),
+				array(
 					'status' => 404,
 				)
 			);
@@ -1339,8 +1569,10 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 
 		if ( ! wc_rest_check_post_permissions( $this->post_type, 'delete', $object->get_id() ) ) {
 			return new WP_Error(
+				"woocommerce_rest_user_cannot_delete_{$this->post_type}",
 				/* translators: %s: post type */
-				"woocommerce_rest_user_cannot_delete_{$this->post_type}", sprintf( __( 'Sorry, you are not allowed to delete %s.', 'classic-commerce' ), $this->post_type ), array(
+				sprintf( __( 'Sorry, you are not allowed to delete %s.', 'classic-commerce' ), $this->post_type ),
+				array(
 					'status' => rest_authorization_required_code(),
 				)
 			);
@@ -1375,8 +1607,10 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 			// If we don't support trashing for this type, error out.
 			if ( ! $supports_trash ) {
 				return new WP_Error(
+					'woocommerce_rest_trash_not_supported',
 					/* translators: %s: post type */
-					'woocommerce_rest_trash_not_supported', sprintf( __( 'The %s does not support trashing.', 'classic-commerce' ), $this->post_type ), array(
+					sprintf( __( 'The %s does not support trashing.', 'classic-commerce' ), $this->post_type ),
+					array(
 						'status' => 501,
 					)
 				);
@@ -1386,8 +1620,10 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 			if ( is_callable( array( $object, 'get_status' ) ) ) {
 				if ( 'trash' === $object->get_status() ) {
 					return new WP_Error(
+						'woocommerce_rest_already_trashed',
 						/* translators: %s: post type */
-						'woocommerce_rest_already_trashed', sprintf( __( 'The %s has already been deleted.', 'classic-commerce' ), $this->post_type ), array(
+						sprintf( __( 'The %s has already been deleted.', 'classic-commerce' ), $this->post_type ),
+						array(
 							'status' => 410,
 						)
 					);
@@ -1400,8 +1636,10 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 
 		if ( ! $result ) {
 			return new WP_Error(
+				'woocommerce_rest_cannot_delete',
 				/* translators: %s: post type */
-				'woocommerce_rest_cannot_delete', sprintf( __( 'The %s cannot be deleted.', 'classic-commerce' ), $this->post_type ), array(
+				sprintf( __( 'The %s cannot be deleted.', 'classic-commerce' ), $this->post_type ),
+				array(
 					'status' => 500,
 				)
 			);
@@ -1495,7 +1733,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 					'description' => __( 'Product status (post status).', 'classic-commerce' ),
 					'type'        => 'string',
 					'default'     => 'publish',
-					'enum'        => array_keys( get_post_statuses() ),
+					'enum'        => array_merge( array_keys( get_post_statuses() ), array( 'future' ) ),
 					'context'     => array( 'view', 'edit' ),
 				),
 				'featured'              => array(
@@ -1666,7 +1904,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 				),
 				'stock_quantity'        => array(
 					'description' => __( 'Stock quantity.', 'classic-commerce' ),
-					'type'        => 'integer',
+					'type'        => has_filter( 'woocommerce_stock_amount', 'intval' ) ? 'integer' : 'number',
 					'context'     => array( 'view', 'edit' ),
 				),
 				'in_stock'              => array(
@@ -2053,6 +2291,8 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 	public function get_collection_params() {
 		$params = parent::get_collection_params();
 
+		$params['orderby']['enum'] = array_merge( $params['orderby']['enum'], array( 'menu_order' ) );
+
 		$params['slug']           = array(
 			'description'       => __( 'Limit result set to products with a specific slug.', 'classic-commerce' ),
 			'type'              => 'string',
@@ -2062,7 +2302,7 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 			'default'           => 'any',
 			'description'       => __( 'Limit result set to products assigned a specific status.', 'classic-commerce' ),
 			'type'              => 'string',
-			'enum'              => array_merge( array( 'any' ), array_keys( get_post_statuses() ) ),
+			'enum'              => array_merge( array( 'any', 'future', 'trash' ), array_keys( get_post_statuses() ) ),
 			'sanitize_callback' => 'sanitize_key',
 			'validate_callback' => 'rest_validate_request_arg',
 		);
@@ -2149,6 +2389,24 @@ class WC_REST_Products_V2_Controller extends WC_REST_Legacy_Products_Controller 
 			'type'              => 'string',
 			'sanitize_callback' => 'sanitize_text_field',
 			'validate_callback' => 'rest_validate_request_arg',
+		);
+        $params['include_meta'] = array(
+			'default'           => array(),
+			'description'       => __( 'Limit meta_data to specific keys.', 'classic-commerce' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type' => 'string',
+			),
+			'sanitize_callback' => 'wp_parse_list',
+		);
+		$params['exclude_meta'] = array(
+			'default'           => array(),
+			'description'       => __( 'Ensure meta_data excludes specific keys.', 'classic-commerce' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type' => 'string',
+			),
+			'sanitize_callback' => 'wp_parse_list',
 		);
 
 		return $params;

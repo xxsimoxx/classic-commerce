@@ -168,7 +168,7 @@ class WC_Order_Item_Meta {
 	 * @return array
 	 */
 	public function get_formatted_legacy( $hideprefix = '_' ) {
-		if ( ! is_ajax() ) {
+		if ( ! wp_doing_ajax() ) {
 			wc_deprecated_argument( 'WC_Order_Item_Meta::get_formatted', '2.4', 'Item Meta Data is being called with legacy arguments' );
 		}
 
@@ -205,7 +205,7 @@ class WC_Order_Item_Meta {
 				$formatted_meta[ $formatted_meta_key ] = array(
 					'key'   => $meta_key,
 					'label' => wc_attribute_label( $attribute_key, $this->product ),
-					'value' => apply_filters( 'woocommerce_order_item_display_meta_value', $meta_value ),
+					'value' => apply_filters( 'woocommerce_order_item_display_meta_value', $meta_value, $this->meta, $this->item ),
 				);
 			}
 		}

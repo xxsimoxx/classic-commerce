@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<p class="description"><?php echo wp_kses_post( $tool['desc'] ); ?></p>
 					</th>
 					<td class="run-tool">
-						<a href="<?php echo wp_nonce_url( admin_url( 'admin.php?page=wc-status&tab=tools&action=' . $action ), 'debug_action' ); ?>" class="button button-large <?php echo esc_attr( $action ); ?>"><?php echo esc_html( $tool['button'] ); ?></a>
+                        <a href="<?php echo wp_nonce_url( admin_url( 'admin.php?page=wc-status&tab=tools&action=' . $action ), 'debug_action' ); ?>" class="button button-large <?php echo esc_attr( $action ); ?>"><?php echo esc_html( $tool['button'] ); ?></a>
 					</td>
 				</tr>
 			<?php endforeach; ?>

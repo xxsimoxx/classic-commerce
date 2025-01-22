@@ -50,10 +50,11 @@ class WC_Widget_Products extends WC_Widget {
 				'std'     => 'date',
 				'label'   => __( 'Order by', 'classic-commerce' ),
 				'options' => array(
-					'date'  => __( 'Date', 'classic-commerce' ),
-					'price' => __( 'Price', 'classic-commerce' ),
-					'rand'  => __( 'Random', 'classic-commerce' ),
-					'sales' => __( 'Sales', 'classic-commerce' ),
+                    'menu_order' => __( 'Menu order', 'classic-commerce' ),
+					'date'       => __( 'Date', 'classic-commerce' ),
+					'price'      => __( 'Price', 'classic-commerce' ),
+					'rand'       => __( 'Random', 'classic-commerce' ),
+					'sales'      => __( 'Sales', 'classic-commerce' ),
 				),
 			),
 			'order'       => array(
@@ -85,6 +86,7 @@ class WC_Widget_Products extends WC_Widget {
 	 *
 	 * @param  array $args     Arguments.
 	 * @param  array $instance Widget instance.
+     *
 	 * @return WP_Query
 	 */
 	public function get_products( $args, $instance ) {
@@ -126,7 +128,7 @@ class WC_Widget_Products extends WC_Widget {
 		}
 
 		if ( 'yes' === get_option( 'woocommerce_hide_out_of_stock_items' ) ) {
-			$query_args['tax_query'] = array(
+			$query_args['tax_query'][] = array(
 				array(
 					'taxonomy' => 'product_visibility',
 					'field'    => 'term_taxonomy_id',
@@ -152,6 +154,9 @@ class WC_Widget_Products extends WC_Widget {
 		}
 
 		switch ( $orderby ) {
+            case 'menu_order':
+				$query_args['orderby'] = 'menu_order';
+				break;
 			case 'price':
 				$query_args['meta_key'] = '_price'; // WPCS: slow query ok.
 				$query_args['orderby']  = 'meta_value_num';
@@ -173,10 +178,10 @@ class WC_Widget_Products extends WC_Widget {
 	/**
 	 * Output widget.
 	 *
-	 * @see WP_Widget
-	 *
 	 * @param array $args     Arguments.
 	 * @param array $instance Widget instance.
+     *
+     * @see WP_Widget
 	 */
 	public function widget( $args, $instance ) {
 		if ( $this->get_cached_widget( $args ) ) {
@@ -184,6 +189,8 @@ class WC_Widget_Products extends WC_Widget {
 		}
 
 		ob_start();
+
+        wc_set_loop_prop( 'name', 'widget' );
 
 		$products = $this->get_products( $args, $instance );
 		if ( $products && $products->have_posts() ) {

@@ -3,7 +3,7 @@
  * Plugin Name: Classic Commerce
  * Plugin URI: https://github.com/ClassicPress-plugins/classic-commerce
  * Description: A simple, powerful and independent e-commerce platform. Sell anything with ease.
- * Version: 1.0.5
+ * Version: 2.0.3
  * Author: ClassicPress Research Team
  * Author URI: https://github.com/ClassicPress-plugins/classic-commerce
  * Text Domain: classic-commerce
@@ -143,7 +143,7 @@ if ( $_cc_can_load ) {
 	////////////////////////////////////////////
 
 	// Load the Update Client to manage Classic Commerce updates.
-	include_once dirname( __FILE__ ) . '/includes/class-wc-update-client.php';
+	//include_once dirname( __FILE__ ) . '/includes/class-wc-update-client.php';
 
 	// Define WC_PLUGIN_FILE.
 	if ( ! defined( 'WC_PLUGIN_FILE' ) ) {
@@ -156,14 +156,12 @@ if ( $_cc_can_load ) {
 	}
 
 	/**
-	 * Main instance of WooCommerce.
-	 *
-	 * Returns the main instance of WC to prevent the need to use globals.
+	 * Returns the main instance of WC.
 	 *
 	 * @since  2.1
 	 * @return WooCommerce
 	 */
-	function wc() {
+	function wc() { // phpcs:ignore
 		return WooCommerce::instance();
 	}
 

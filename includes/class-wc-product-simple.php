@@ -39,15 +39,8 @@ class WC_Product_Simple extends WC_Product {
 	 * @return string
 	 */
 	public function add_to_cart_url() {
-		$url = $this->is_purchasable() && $this->is_in_stock() ? remove_query_arg(
-			'added-to-cart',
-			add_query_arg(
-				array(
-					'add-to-cart' => $this->get_id(),
-				),
-				( function_exists( 'is_feed' ) && is_feed() ) || ( function_exists( 'is_404' ) && is_404() ) ? $this->get_permalink() : ''
-			)
-		) : $this->get_permalink();
+		$url = $this->is_purchasable() && $this->is_in_stock() ? remove_query_arg( 'added-to-cart', add_query_arg( 'add-to-cart', $this->id ) ) : get_permalink( $this->id );
+		
 		return apply_filters( 'woocommerce_product_add_to_cart_url', $url, $this );
 	}
 
@@ -70,7 +63,7 @@ class WC_Product_Simple extends WC_Product {
 	 */
 	public function add_to_cart_description() {
 		/* translators: %s: Product title */
-		$text = $this->is_purchasable() && $this->is_in_stock() ? __( 'Add &ldquo;%s&rdquo; to your cart', 'classic-commerce' ) : __( 'Read more about &ldquo;%s&rdquo;', 'classic-commerce' );
+		$text = $this->is_purchasable() && $this->is_in_stock() ? __( 'Add to cart &ldquo;%s&rdquo;', 'classic-commerce' ) : __( 'Read more about &ldquo;%s&rdquo;', 'classic-commerce' );
 
 		return apply_filters( 'woocommerce_product_add_to_cart_description', sprintf( $text, $this->get_name() ), $this );
 	}

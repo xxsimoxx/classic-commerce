@@ -185,6 +185,19 @@ abstract class WC_Data {
 	 * @return bool result
 	 */
 	public function delete( $force_delete = false ) {
+        /**
+		 * Filters whether an object deletion should take place. Equivalent to `pre_delete_post`.
+		 *
+		 * @param mixed   $check Whether to go ahead with deletion.
+		 * @param WC_Data $this The data object being deleted.
+		 * @param bool    $force_delete Whether to bypass the trash.
+		 *
+		 * @since WC-8.1.0.
+		 */
+		$check = apply_filters( "woocommerce_pre_delete_$this->object_type", null, $this, $force_delete );
+		if ( null !== $check ) {
+			return $check;
+		}
 		if ( $this->data_store ) {
 			$this->data_store->delete( $this, array( 'force_delete' => $force_delete ) );
 			$this->set_id( 0 );
@@ -289,7 +302,7 @@ abstract class WC_Data {
 			return false;
 		}
 
-		$has_setter_or_getter = is_callable( array( $this, 'set_' . $key ) ) || is_callable( array( $this, 'get_' . $key ) );
+		$has_setter_or_getter = is_callable( array( $this, 'set_' . ltrim( $key, '_' ) ) ) || is_callable( array( $this, 'get_' . ltrim( $key, '_' ) ) );
 
 		if ( ! $has_setter_or_getter ) {
 			return false;
@@ -311,7 +324,7 @@ abstract class WC_Data {
 	 */
 	public function get_meta( $key = '', $single = true, $context = 'view' ) {
 		if ( $this->is_internal_meta_key( $key ) ) {
-			$function = 'get_' . $key;
+			$function = 'get_' . ltrim( $key, '_' );
 
 			if ( is_callable( array( $this, $function ) ) ) {
 				return $this->{$function}();
@@ -330,10 +343,10 @@ abstract class WC_Data {
 			} else {
 				$value = array_intersect_key( $meta_data, array_flip( $array_keys ) );
 			}
+        }
 
-			if ( 'view' === $context ) {
-				$value = apply_filters( $this->get_hook_prefix() . $key, $value, $this );
-			}
+        if ( 'view' === $context ) {
+			$value = apply_filters( $this->get_hook_prefix() . $key, $value, $this );
 		}
 
 		return $value;
@@ -385,7 +398,7 @@ abstract class WC_Data {
 	 */
 	public function add_meta_data( $key, $value, $unique = false ) {
 		if ( $this->is_internal_meta_key( $key ) ) {
-			$function = 'set_' . $key;
+			$function = 'set_' . ltrim( $key, '_' );
 
 			if ( is_callable( array( $this, $function ) ) ) {
 				return $this->{$function}( $value );
@@ -413,7 +426,7 @@ abstract class WC_Data {
 	 */
 	public function update_meta_data( $key, $value, $meta_id = 0 ) {
 		if ( $this->is_internal_meta_key( $key ) ) {
-			$function = 'set_' . $key;
+			$function = 'set_' . ltrim( $key, '_' );
 
 			if ( is_callable( array( $this, $function ) ) ) {
 				return $this->{$function}( $value );
@@ -471,6 +484,26 @@ abstract class WC_Data {
 		}
 	}
 
+    /**
+	 * Delete meta data with a matching value.
+	 *
+	 * @since 7.7.0
+	 * @param string $key   Meta key.
+	 * @param mixed  $value Meta value. Entries will only be removed that match the value.
+	 */
+	public function delete_meta_data_value( $key, $value ) {
+		$this->maybe_read_meta_data();
+		$array_keys = array_keys( wp_list_pluck( $this->meta_data, 'key' ), $key, true );
+
+		if ( $array_keys ) {
+			foreach ( $array_keys as $array_key ) {
+				if ( $value === $this->meta_data[ $array_key ]->value ) {
+					$this->meta_data[ $array_key ]->value = null;
+				}
+			}
+		}
+	}
+
 	/**
 	 * Delete meta data.
 	 *
@@ -499,6 +532,50 @@ abstract class WC_Data {
 		}
 	}
 
+    /**
+	 * Helper method to compute meta cache key. Different from WP Meta cache key in that meta data cached using this key also contains meta_id column.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @return string
+	 */
+	public function get_meta_cache_key() {
+		if ( ! $this->get_id() ) {
+			wc_doing_it_wrong( 'get_meta_cache_key', 'ID needs to be set before fetching a cache key.', '4.7.0' );
+			return false;
+		}
+		return self::generate_meta_cache_key( $this->get_id(), $this->cache_group );
+	}
+
+	/**
+	 * Generate cache key from id and group.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param int|string $id          Object ID.
+	 * @param string     $cache_group Group name use to store cache. Whole group cache can be invalidated in one go.
+	 *
+	 * @return string Meta cache key.
+	 */
+	public static function generate_meta_cache_key( $id, $cache_group ) {
+		return WC_Cache_Helper::get_cache_prefix( $cache_group ) . WC_Cache_Helper::get_cache_prefix( 'object_' . $id ) . 'object_meta_' . $id;
+	}
+
+	/**
+	 * Prime caches for raw meta data. This includes meta_id column as well, which is not included by default in WP meta data.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param array  $raw_meta_data_collection Array of objects of { object_id => array( meta_row_1, meta_row_2, ... }.
+	 * @param string $cache_group              Name of cache group.
+	 */
+	public static function prime_raw_meta_data_cache( $raw_meta_data_collection, $cache_group ) {
+		foreach ( $raw_meta_data_collection as $object_id => $raw_meta_data_array ) {
+			$cache_key = self::generate_meta_cache_key( $object_id, $cache_group );
+			wp_cache_set( $cache_key, $raw_meta_data_array, $cache_group );
+		}
+	}
+
 	/**
 	 * Read Meta Data from the database. Ignore any internal properties.
 	 * Uses it's own caches because get_metadata does not provide meta_ids.
@@ -520,18 +597,20 @@ abstract class WC_Data {
 
 		if ( ! empty( $this->cache_group ) ) {
 			// Prefix by group allows invalidation by group until https://core.trac.wordpress.org/ticket/4476 is implemented.
-			$cache_key = WC_Cache_Helper::get_cache_prefix( $this->cache_group ) . WC_Cache_Helper::get_cache_prefix( 'object_' . $this->get_id() ) . 'object_meta_' . $this->get_id();
+			$cache_key = $this->get_meta_cache_key();
 		}
 
 		if ( ! $force_read ) {
 			if ( ! empty( $this->cache_group ) ) {
 				$cached_meta  = wp_cache_get( $cache_key, $this->cache_group );
-				$cache_loaded = ! empty( $cached_meta );
+				$cache_loaded = is_array( $cached_meta );
 			}
 		}
 
-		$raw_meta_data = $cache_loaded ? $cached_meta : $this->data_store->read_meta( $this );
-		if ( $raw_meta_data ) {
+		// We filter the raw meta data again when loading from cache, in case we cached in an earlier version where filter conditions were different.
+		$raw_meta_data = $cache_loaded ? $this->data_store->filter_raw_meta_data( $this, $cached_meta ) : $this->data_store->read_meta( $this );
+        
+		if ( is_array( $raw_meta_data ) ) {
 			foreach ( $raw_meta_data as $meta ) {
 				$this->meta_data[] = new WC_Meta_Data( array(
 					'id'    => (int) $meta->meta_id,
@@ -657,7 +736,7 @@ abstract class WC_Data {
 	 * Sets a prop for a setter method.
 	 *
 	 * This stores changes in a special array so we can track what needs saving
-	 * the the DB later.
+	 * the DB later.
 	 *
 	 * @since WC-3.0.0
 	 * @param string $prop Name of prop to set.

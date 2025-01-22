@@ -7,7 +7,7 @@
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @author  WooThemes
  * @package ClassicCommerce/Templates
- * @version WC-2.4.0
+ * @version WC-3.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -38,5 +38,6 @@ if ( ! empty( $tabs ) ) : ?>
 			</div>
 		<?php endforeach; ?>
 	</div>
+    <?php do_action( 'woocommerce_product_after_tabs' );
 
-<?php endif; ?>
+    endif; ?>

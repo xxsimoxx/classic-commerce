@@ -4,8 +4,8 @@
  *
  * Handles requests to the /orders/<order_id>/refunds endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Order Refunds controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Orders_V2_Controller
  */
 class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
@@ -58,7 +58,9 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 	 */
 	public function register_routes() {
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base, array(
+			$this->namespace,
+			'/' . $this->rest_base,
+			array(
 				'args'   => array(
 					'order_id' => array(
 						'description' => __( 'The order ID.', 'classic-commerce' ),
@@ -82,7 +84,9 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 		);
 
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base . '/(?P<id>[\d]+)', array(
+			$this->namespace,
+			'/' . $this->rest_base . '/(?P<id>[\d]+)',
+			array(
 				'args'   => array(
 					'order_id' => array(
 						'description' => __( 'The order ID.', 'classic-commerce' ),
@@ -121,7 +125,7 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 	/**
 	 * Get object.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  int $id Object ID.
 	 * @return WC_Data
 	 */
@@ -132,7 +136,7 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 	/**
 	 * Get formatted item data.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WC_Data $object WC_Data instance.
 	 * @return array
 	 */
@@ -140,7 +144,7 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 		$data              = $object->get_data();
 		$format_decimal    = array( 'amount' );
 		$format_date       = array( 'date_created' );
-		$format_line_items = array( 'line_items' );
+		$format_line_items = array( 'line_items', 'shipping_lines', 'tax_lines', 'fee_lines' );
 
 		// Format decimal values.
 		foreach ( $format_decimal as $key ) {
@@ -169,13 +173,16 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 			'refunded_payment' => $data['refunded_payment'],
 			'meta_data'        => $data['meta_data'],
 			'line_items'       => $data['line_items'],
+			'shipping_lines'   => $data['shipping_lines'],
+			'tax_lines'        => $data['tax_lines'],
+			'fee_lines'        => $data['fee_lines'],
 		);
 	}
 
 	/**
 	 * Prepare a single order output for response.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 *
 	 * @param  WC_Data         $object  Object data.
 	 * @param  WP_REST_Request $request Request object.
@@ -245,7 +252,7 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 	/**
 	 * Prepare objects query.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WP_REST_Request $request Full details about the request.
 	 * @return array
 	 */
@@ -261,7 +268,7 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 	/**
 	 * Prepares one object for create or update operation.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WP_REST_Request $request Request object.
 	 * @param  bool            $creating If is creating a new object.
 	 * @return WP_Error|WC_Data The prepared item, or WP_Error object on failure.
@@ -319,7 +326,7 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 	/**
 	 * Save an object data.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WP_REST_Request $request  Full details about the request.
 	 * @param  bool            $creating If is creating a new object.
 	 * @return WC_Data|WP_Error
@@ -341,7 +348,7 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 	}
 
 	/**
-	 * Get the Order's schema, conforming to JSON Schema.
+	 * Get the refund schema, conforming to JSON Schema.
 	 *
 	 * @return array
 	 */
@@ -387,7 +394,7 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 				'refunded_payment' => array(
 					'description' => __( 'If the payment was refunded via the API.', 'classic-commerce' ),
 					'type'        => 'boolean',
-					'context'     => array( 'view' ),
+					'context'     => array( 'view', 'edit' ),
 					'readonly'    => true,
 				),
 				'meta_data'        => array(
@@ -553,6 +560,274 @@ class WC_REST_Order_Refunds_V2_Controller extends WC_REST_Orders_V2_Controller {
 								'type'        => 'number',
 								'context'     => array( 'view', 'edit' ),
 								'readonly'    => true,
+							),
+						),
+					),
+				),
+                'tax_lines'        => array(
+					'description' => __( 'Tax lines data.', 'classic-commerce' ),
+					'type'        => 'array',
+					'context'     => array( 'view', 'edit' ),
+					'readonly'    => true,
+					'items'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'id'                 => array(
+								'description' => __( 'Item ID.', 'classic-commerce' ),
+								'type'        => 'integer',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'rate_code'          => array(
+								'description' => __( 'Tax rate code.', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'rate_id'            => array(
+								'description' => __( 'Tax rate ID.', 'classic-commerce' ),
+								'type'        => 'integer',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'label'              => array(
+								'description' => __( 'Tax rate label.', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'compound'           => array(
+								'description' => __( 'Show if is a compound tax rate.', 'classic-commerce' ),
+								'type'        => 'boolean',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'tax_total'          => array(
+								'description' => __( 'Tax total (not including shipping taxes).', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'shipping_tax_total' => array(
+								'description' => __( 'Shipping tax total.', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'meta_data'          => array(
+								'description' => __( 'Meta data.', 'classic-commerce' ),
+								'type'        => 'array',
+								'context'     => array( 'view', 'edit' ),
+								'items'       => array(
+									'type'       => 'object',
+									'properties' => array(
+										'id'    => array(
+											'description' => __( 'Meta ID.', 'classic-commerce' ),
+											'type'        => 'integer',
+											'context'     => array( 'view', 'edit' ),
+											'readonly'    => true,
+										),
+										'key'   => array(
+											'description' => __( 'Meta key.', 'classic-commerce' ),
+											'type'        => 'string',
+											'context'     => array( 'view', 'edit' ),
+										),
+										'value' => array(
+											'description' => __( 'Meta value.', 'classic-commerce' ),
+											'type'        => 'mixed',
+											'context'     => array( 'view', 'edit' ),
+										),
+									),
+								),
+							),
+						),
+					),
+				),
+				'shipping_lines'   => array(
+					'description' => __( 'Shipping lines data.', 'classic-commerce' ),
+					'type'        => 'array',
+					'context'     => array( 'view', 'edit' ),
+					'items'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'id'           => array(
+								'description' => __( 'Item ID.', 'classic-commerce' ),
+								'type'        => 'integer',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'method_title' => array(
+								'description' => __( 'Shipping method name.', 'classic-commerce' ),
+								'type'        => 'mixed',
+								'context'     => array( 'view', 'edit' ),
+							),
+							'method_id'    => array(
+								'description' => __( 'Shipping method ID.', 'classic-commerce' ),
+								'type'        => 'mixed',
+								'context'     => array( 'view', 'edit' ),
+							),
+							'instance_id'  => array(
+								'description' => __( 'Shipping instance ID.', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+							),
+							'total'        => array(
+								'description' => __( 'Line total (after discounts).', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+							),
+							'total_tax'    => array(
+								'description' => __( 'Line total tax (after discounts).', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'taxes'        => array(
+								'description' => __( 'Line taxes.', 'classic-commerce' ),
+								'type'        => 'array',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+								'items'       => array(
+									'type'       => 'object',
+									'properties' => array(
+										'id'    => array(
+											'description' => __( 'Tax rate ID.', 'classic-commerce' ),
+											'type'        => 'integer',
+											'context'     => array( 'view', 'edit' ),
+											'readonly'    => true,
+										),
+										'total' => array(
+											'description' => __( 'Tax total.', 'classic-commerce' ),
+											'type'        => 'string',
+											'context'     => array( 'view', 'edit' ),
+											'readonly'    => true,
+										),
+									),
+								),
+							),
+							'meta_data'    => array(
+								'description' => __( 'Meta data.', 'classic-commerce' ),
+								'type'        => 'array',
+								'context'     => array( 'view', 'edit' ),
+								'items'       => array(
+									'type'       => 'object',
+									'properties' => array(
+										'id'    => array(
+											'description' => __( 'Meta ID.', 'classic-commerce' ),
+											'type'        => 'integer',
+											'context'     => array( 'view', 'edit' ),
+											'readonly'    => true,
+										),
+										'key'   => array(
+											'description' => __( 'Meta key.', 'classic-commerce' ),
+											'type'        => 'string',
+											'context'     => array( 'view', 'edit' ),
+										),
+										'value' => array(
+											'description' => __( 'Meta value.', 'classic-commerce' ),
+											'type'        => 'mixed',
+											'context'     => array( 'view', 'edit' ),
+										),
+									),
+								),
+							),
+						),
+					),
+				),
+				'fee_lines'        => array(
+					'description' => __( 'Fee lines data.', 'classic-commerce' ),
+					'type'        => 'array',
+					'context'     => array( 'view', 'edit' ),
+					'items'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'id'         => array(
+								'description' => __( 'Item ID.', 'classic-commerce' ),
+								'type'        => 'integer',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'name'       => array(
+								'description' => __( 'Fee name.', 'classic-commerce' ),
+								'type'        => 'mixed',
+								'context'     => array( 'view', 'edit' ),
+							),
+							'tax_class'  => array(
+								'description' => __( 'Tax class of fee.', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+							),
+							'tax_status' => array(
+								'description' => __( 'Tax status of fee.', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+								'enum'        => array( 'taxable', 'none' ),
+							),
+							'total'      => array(
+								'description' => __( 'Line total (after discounts).', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+							),
+							'total_tax'  => array(
+								'description' => __( 'Line total tax (after discounts).', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+							),
+							'taxes'      => array(
+								'description' => __( 'Line taxes.', 'classic-commerce' ),
+								'type'        => 'array',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+								'items'       => array(
+									'type'       => 'object',
+									'properties' => array(
+										'id'       => array(
+											'description' => __( 'Tax rate ID.', 'classic-commerce' ),
+											'type'        => 'integer',
+											'context'     => array( 'view', 'edit' ),
+											'readonly'    => true,
+										),
+										'total'    => array(
+											'description' => __( 'Tax total.', 'classic-commerce' ),
+											'type'        => 'string',
+											'context'     => array( 'view', 'edit' ),
+											'readonly'    => true,
+										),
+										'subtotal' => array(
+											'description' => __( 'Tax subtotal.', 'classic-commerce' ),
+											'type'        => 'string',
+											'context'     => array( 'view', 'edit' ),
+											'readonly'    => true,
+										),
+									),
+								),
+							),
+							'meta_data'  => array(
+								'description' => __( 'Meta data.', 'classic-commerce' ),
+								'type'        => 'array',
+								'context'     => array( 'view', 'edit' ),
+								'items'       => array(
+									'type'       => 'object',
+									'properties' => array(
+										'id'    => array(
+											'description' => __( 'Meta ID.', 'classic-commerce' ),
+											'type'        => 'integer',
+											'context'     => array( 'view', 'edit' ),
+											'readonly'    => true,
+										),
+										'key'   => array(
+											'description' => __( 'Meta key.', 'classic-commerce' ),
+											'type'        => 'string',
+											'context'     => array( 'view', 'edit' ),
+										),
+										'value' => array(
+											'description' => __( 'Meta value.', 'classic-commerce' ),
+											'type'        => 'mixed',
+											'context'     => array( 'view', 'edit' ),
+										),
+									),
+								),
 							),
 						),
 					),

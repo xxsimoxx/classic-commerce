@@ -3,16 +3,19 @@
  * Countries
  *
  * Returns an array of countries and codes.
+ * Country codes and names should follow the Unicode CLDR recommendation (https://cldr.unicode.org/translation/displaynames/countryregion-territory-names).
  *
- * @package ClassicCommerce/i18n
- * @version WC-2.5.0
+ * See https://github.com/unicode-org/cldr/blob/master/common/subdivisions/en.xml
+ *
+ * @package WooCommerce\i18n
+ * @version 3.8.0
  */
 
 defined( 'ABSPATH' ) || exit;
 
 return array(
 	'AF' => __( 'Afghanistan', 'classic-commerce' ),
-	'AX' => __( '&#197;land Islands', 'classic-commerce' ),
+	'AX' => __( 'Åland Islands', 'classic-commerce' ),
 	'AL' => __( 'Albania', 'classic-commerce' ),
 	'DZ' => __( 'Algeria', 'classic-commerce' ),
 	'AS' => __( 'American Samoa', 'classic-commerce' ),
@@ -45,7 +48,6 @@ return array(
 	'BV' => __( 'Bouvet Island', 'classic-commerce' ),
 	'BR' => __( 'Brazil', 'classic-commerce' ),
 	'IO' => __( 'British Indian Ocean Territory', 'classic-commerce' ),
-	'VG' => __( 'British Virgin Islands', 'classic-commerce' ),
 	'BN' => __( 'Brunei', 'classic-commerce' ),
 	'BG' => __( 'Bulgaria', 'classic-commerce' ),
 	'BF' => __( 'Burkina Faso', 'classic-commerce' ),
@@ -140,8 +142,8 @@ return array(
 	'LI' => __( 'Liechtenstein', 'classic-commerce' ),
 	'LT' => __( 'Lithuania', 'classic-commerce' ),
 	'LU' => __( 'Luxembourg', 'classic-commerce' ),
-	'MO' => __( 'Macao S.A.R., China', 'classic-commerce' ),
-	'MK' => __( 'Macedonia', 'classic-commerce' ),
+	'MO' => __( 'Macao', 'classic-commerce' ),
+	'MK' => __( 'North Macedonia', 'classic-commerce' ),
 	'MG' => __( 'Madagascar', 'classic-commerce' ),
 	'MW' => __( 'Malawi', 'classic-commerce' ),
 	'MY' => __( 'Malaysia', 'classic-commerce' ),
@@ -223,7 +225,7 @@ return array(
 	'SD' => __( 'Sudan', 'classic-commerce' ),
 	'SR' => __( 'Suriname', 'classic-commerce' ),
 	'SJ' => __( 'Svalbard and Jan Mayen', 'classic-commerce' ),
-	'SZ' => __( 'Swaziland', 'classic-commerce' ),
+	'SZ' => __( 'Eswatini', 'classic-commerce' ),
 	'SE' => __( 'Sweden', 'classic-commerce' ),
 	'CH' => __( 'Switzerland', 'classic-commerce' ),
 	'SY' => __( 'Syria', 'classic-commerce' ),
@@ -247,13 +249,14 @@ return array(
 	'GB' => __( 'United Kingdom (UK)', 'classic-commerce' ),
 	'US' => __( 'United States (US)', 'classic-commerce' ),
 	'UM' => __( 'United States (US) Minor Outlying Islands', 'classic-commerce' ),
-	'VI' => __( 'United States (US) Virgin Islands', 'classic-commerce' ),
 	'UY' => __( 'Uruguay', 'classic-commerce' ),
 	'UZ' => __( 'Uzbekistan', 'classic-commerce' ),
 	'VU' => __( 'Vanuatu', 'classic-commerce' ),
 	'VA' => __( 'Vatican', 'classic-commerce' ),
 	'VE' => __( 'Venezuela', 'classic-commerce' ),
 	'VN' => __( 'Vietnam', 'classic-commerce' ),
+	'VG' => __( 'Virgin Islands (British)', 'classic-commerce' ),
+	'VI' => __( 'Virgin Islands (US)', 'classic-commerce' ),
 	'WF' => __( 'Wallis and Futuna', 'classic-commerce' ),
 	'EH' => __( 'Western Sahara', 'classic-commerce' ),
 	'WS' => __( 'Samoa', 'classic-commerce' ),

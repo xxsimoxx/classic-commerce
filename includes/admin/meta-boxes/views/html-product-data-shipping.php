@@ -50,6 +50,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			'id'               => 'product_shipping_class',
 			'selected'         => $product_object->get_shipping_class_id( 'edit' ),
 			'class'            => 'select short',
+            'orderby'          => 'name',
 		);
 		?>
 		<p class="form-field shipping_class_field">
@@ -62,4 +63,5 @@ if ( ! defined( 'ABSPATH' ) ) {
 		do_action( 'woocommerce_product_options_shipping' );
 		?>
 	</div>
+    <?php do_action( 'woocommerce_product_options_shipping_product_data' ); ?>
 </div>

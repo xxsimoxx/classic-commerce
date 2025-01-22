@@ -5,9 +5,8 @@
  * Functions for determining the current query/page.
  *
  * @package     ClassicCommerce/Functions
- * @version     2.3.0
+ * @version     2.0.3
  */
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -100,7 +99,7 @@ if ( ! function_exists( 'is_cart' ) ) {
 if ( ! function_exists( 'is_checkout' ) ) {
 
 	/**
-	 * Is_checkout - Returns true when viewing the checkout page.
+	 * Is_checkout - Returns true when viewing the checkout page, or when processing AJAX requests for updating or processing the checkout.
 	 *
 	 * @return bool
 	 */
@@ -254,18 +253,6 @@ if ( ! function_exists( 'is_lost_password_page' ) ) {
 	}
 }
 
-if ( ! function_exists( 'is_ajax' ) ) {
-
-	/**
-	 * Is_ajax - Returns true when the page is loaded via ajax.
-	 *
-	 * @return bool
-	 */
-	function is_ajax() {
-		return function_exists( 'wp_doing_ajax' ) ? wp_doing_ajax() : defined( 'DOING_AJAX' );
-	}
-}
-
 if ( ! function_exists( 'is_store_notice_showing' ) ) {
 
 	/**
@@ -361,7 +348,7 @@ if ( ! function_exists( 'wc_prices_include_tax' ) ) {
 	 * @return bool
 	 */
 	function wc_prices_include_tax() {
-		return wc_tax_enabled() && 'yes' === get_option( 'woocommerce_prices_include_tax' );
+		return wc_tax_enabled() && apply_filters( 'woocommerce_prices_include_tax', get_option( 'woocommerce_prices_include_tax' ) === 'yes' );
 	}
 }
 
@@ -420,9 +407,39 @@ function wc_post_content_has_shortcode( $tag = '' ) {
 }
 
 /**
+ * Check if reviews are enabled.
+ *
+ * @since 3.6.0
+ * @return bool
+ */
+function wc_reviews_enabled() {
+	return 'yes' === get_option( 'woocommerce_enable_reviews' );
+}
+
+/**
+ * Check if reviews ratings are enabled.
+ *
+ * @since 3.6.0
+ * @return bool
+ */
+function wc_review_ratings_enabled() {
+	return wc_reviews_enabled() && 'yes' === get_option( 'woocommerce_enable_review_rating' );
+}
+
+/**
+ * Check if review ratings are required.
+ *
+ * @since 3.6.0
+ * @return bool
+ */
+function wc_review_ratings_required() {
+	return 'yes' === get_option( 'woocommerce_review_rating_required' );
+}
+
+/**
  * Check if a CSV file is valid.
  *
- * @since WC-3.6.5
+ * @since 3.6.5
  * @param string $file       File name.
  * @param bool   $check_path If should check for the path.
  * @return bool
@@ -431,10 +448,11 @@ function wc_is_file_valid_csv( $file, $check_path = true ) {
 	/**
 	 * Filter check for CSV file path.
 	 *
-	 * @since WC-3.6.4
-	 * @param bool $check_import_file_path If requires file path check. Defaults to true.
+	 * @since 3.6.4
+	 * @param bool   $check_import_file_path If requires file path check. Defaults to true.
+	 * @param string $file                   Path of the file to be checked.
 	 */
-	$check_import_file_path = apply_filters( 'woocommerce_csv_importer_check_import_file_path', true );
+	$check_import_file_path = apply_filters( 'woocommerce_csv_importer_check_import_file_path', true, $file );
 
 	if ( $check_path && $check_import_file_path && false !== stripos( $file, '://' ) ) {
 		return false;

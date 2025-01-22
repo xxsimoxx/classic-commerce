@@ -31,7 +31,7 @@ class WC_Download_Handler {
 	 * Check if we need to download a file and check validity.
 	 */
 	public static function download_product() {
-		$product_id = absint( $_GET['download_file'] ); // phpcs:ignore WordPress.VIP.SuperGlobalInputUsage.AccessDetected, WordPress.VIP.ValidatedSanitizedInput.InputNotValidated
+		$product_id = absint( $_GET['download_file'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated
 		$product    = wc_get_product( $product_id );
 		$data_store = WC_Data_Store::load( 'customer-download' );
 
@@ -44,12 +44,13 @@ class WC_Download_Handler {
 			self::download_error( __( 'Invalid download link.', 'classic-commerce' ) );
 		}
 
+        $order_id = wc_get_order_id_by_order_key( wc_clean( wp_unslash( $_GET['order'] ) ) ); // WPCS: input var ok, CSRF ok.
+		$order    = wc_get_order( $order_id );
+
 		if ( isset( $_GET['email'] ) ) { // WPCS: input var ok, CSRF ok.
 			$email_address = wp_unslash( $_GET['email'] ); // WPCS: input var ok, CSRF ok, sanitization ok.
 		} else {
 			// Get email address from order to verify hash.
-			$order_id      = wc_get_order_id_by_order_key( wc_clean( wp_unslash( $_GET['order'] ) ) ); // WPCS: input var ok, CSRF ok.
-			$order         = wc_get_order( $order_id );
 			$email_address = is_a( $order, 'WC_Order' ) ? $order->get_billing_email() : null;
 
 			// Prepare email address hash.
@@ -79,7 +80,24 @@ class WC_Download_Handler {
 
 		$download = new WC_Customer_Download( current( $download_ids ) );
 
-		$file_path        = $product->get_file_download_path( $download->get_download_id() );
+		/**
+		 * Filter download filepath.
+		 *
+		 * @since 4.0.0
+		 * @param string $file_path File path.
+		 * @param string $email_address Email address.
+		 * @param WC_Order|bool $order Order object or false.
+		 * @param WC_Product $product Product object.
+		 * @param WC_Customer_Download $download Download data.
+		 */
+		$file_path = apply_filters(
+			'woocommerce_download_product_filepath',
+			$product->get_file_download_path( $download->get_download_id() ),
+			$email_address,
+			$order,
+			$product,
+			$download
+		);
 		$parsed_file_path = self::parse_file_path( $file_path );
 		$download_range   = self::get_download_range( @filesize( $parsed_file_path['file_path'] ) );  // @codingStandardsIgnoreLine.
 
@@ -144,7 +162,7 @@ class WC_Download_Handler {
 	 * @param WC_Customer_Download $download Download instance.
 	 */
 	private static function check_download_expiry( $download ) {
-		if ( ! is_null( $download->get_access_expires() ) && $download->get_access_expires()->getTimestamp() < strtotime( 'midnight', current_time( 'timestamp', true ) ) ) {
+		if ( ! is_null( $download->get_access_expires() ) && $download->get_access_expires()->getTimestamp() < strtotime( 'midnight', time() ) ) {
 			self::download_error( __( 'Sorry, this download has expired', 'classic-commerce' ), '', 403 );
 		}
 	}
@@ -172,10 +190,12 @@ class WC_Download_Handler {
 	/**
 	 * Count download.
 	 *
-	 * @deprecated unknown
+	 * @deprecated 4.4.0
 	 * @param      array $download_data Download data.
 	 */
-	public static function count_download( $download_data ) {}
+		public static function count_download( $download_data ) {
+		wc_deprecated_function( 'WC_Download_Handler::count_download', '4.4.0', '' );
+	}
 
 	/**
 	 * Download a file - hook into init function.
@@ -195,7 +215,14 @@ class WC_Download_Handler {
 		}
 
 		$filename             = apply_filters( 'woocommerce_file_download_filename', $filename, $product_id );
-		$file_download_method = apply_filters( 'woocommerce_file_download_method', get_option( 'woocommerce_file_download_method', 'force' ), $product_id );
+        /**
+		 * Filter download method.
+		 * 
+		 * @param string $method     Download method.
+		 * @param int    $product_id Product ID.
+		 * @param string $file_path  URL to file.
+		 */
+		$file_download_method = apply_filters( 'woocommerce_file_download_method', get_option( 'woocommerce_file_download_method', 'force' ), $product_id, $file_path );
 
 		// Add action to prevent issues in IE.
 		add_action( 'nocache_headers', array( __CLASS__, 'ie_nocache_headers_fix' ) );
@@ -239,15 +266,23 @@ class WC_Download_Handler {
 			str_replace( 'https:', 'http:', site_url( '/', 'http' ) ) => ABSPATH,
 		);
 
-		$file_path        = str_replace( array_keys( $replacements ), array_values( $replacements ), $file_path );
+		$file_path        = str_replace( array_keys( $replacements ), array_values( $replacements ), $file_path, $count );
 		$parsed_file_path = wp_parse_url( $file_path );
 		$remote_file      = true;
 
 		// Paths that begin with '//' are always remote URLs.
 		if ( '//' === substr( $file_path, 0, 2 ) ) {
+            $file_path = ( is_ssl() ? 'https:' : 'http:' ) . $file_path;
+
+			/**
+			 * Filter the remote filepath for download.
+			 *
+			 * @since 6.5.0
+			 * @param string $file_path File path.
+			 */
 			return array(
 				'remote_file' => true,
-				'file_path'   => is_ssl() ? 'https:' . $file_path : 'http:' . $file_path,
+				'file_path'   => apply_filters( 'woocommerce_download_parse_remote_file_path', $file_path ),
 			);
 		}
 
@@ -266,9 +301,16 @@ class WC_Download_Handler {
 			$file_path   = $parsed_file_path['path'];
 		}
 
+        /**
+		* Filter the filepath for download.
+		*
+		* @since 6.5.0
+		* @param string  $file_path File path.
+		* @param bool $remote_file Remote File Indicator.
+		*/
 		return array(
 			'remote_file' => $remote_file,
-			'file_path'   => $file_path,
+			'file_path'   => apply_filters( 'woocommerce_download_parse_file_path', $file_path, $remote_file ),
 		);
 	}
 
@@ -283,20 +325,29 @@ class WC_Download_Handler {
 
 		if ( function_exists( 'apache_get_modules' ) && in_array( 'mod_xsendfile', apache_get_modules(), true ) ) {
 			self::download_headers( $parsed_file_path['file_path'], $filename );
-			header( 'X-Sendfile: ' . $parsed_file_path['file_path'] );
+            $filepath = apply_filters( 'woocommerce_download_file_xsendfile_file_path', $parsed_file_path['file_path'], $file_path, $filename, $parsed_file_path );
+			header( 'X-Sendfile: ' . $filepath );
 			exit;
 		} elseif ( stristr( getenv( 'SERVER_SOFTWARE' ), 'lighttpd' ) ) {
 			self::download_headers( $parsed_file_path['file_path'], $filename );
-			header( 'X-Lighttpd-Sendfile: ' . $parsed_file_path['file_path'] );
+            $filepath = apply_filters( 'woocommerce_download_file_xsendfile_lighttpd_file_path', $parsed_file_path['file_path'], $file_path, $filename, $parsed_file_path );
+			header( 'X-Lighttpd-Sendfile: ' . $filepath );
 			exit;
 		} elseif ( stristr( getenv( 'SERVER_SOFTWARE' ), 'nginx' ) || stristr( getenv( 'SERVER_SOFTWARE' ), 'cherokee' ) ) {
 			self::download_headers( $parsed_file_path['file_path'], $filename );
-			$xsendfile_path = trim( preg_replace( '`^' . str_replace( '\\', '/', getcwd() ) . '`', '', $parsed_file_path['file_path'] ), '/' );
+			$xsendfile_path = apply_filters( 'woocommerce_download_file_xsendfile_x_accel_redirect_file_path', $xsendfile_path, $file_path, $filename, $parsed_file_path );
 			header( "X-Accel-Redirect: /$xsendfile_path" );
 			exit;
 		}
 
 		// Fallback.
+        wc_get_logger()->warning(
+			sprintf(
+				/* translators: %1$s contains the filepath of the digital asset. */
+				__( '%1$s could not be served using the X-Accel-Redirect/X-Sendfile method. A Force Download will be used instead.', 'classic-commerce' ),
+				$file_path
+			)
+		);
 		self::download_file_force( $file_path, $filename );
 	}
 
@@ -392,7 +443,14 @@ class WC_Download_Handler {
 		$start  = isset( $download_range['start'] ) ? $download_range['start'] : 0;
 		$length = isset( $download_range['length'] ) ? $download_range['length'] : 0;
 		if ( ! self::readfile_chunked( $parsed_file_path['file_path'], $start, $length ) ) {
-			if ( $parsed_file_path['remote_file'] ) {
+			if ( $parsed_file_path['remote_file'] && 'yes' === get_option( 'woocommerce_downloads_redirect_fallback_allowed' ) ) {
+				wc_get_logger()->warning(
+					sprintf(
+						/* translators: %1$s contains the filepath of the digital asset. */
+						__( '%1$s could not be served using the Force Download method. A redirect will be used instead.', 'classic-commerce' ),
+						$file_path
+					)
+				);
 				self::download_file_redirect( $file_path );
 			} else {
 				self::download_error( __( 'File not found', 'classic-commerce' ) );
@@ -438,7 +496,7 @@ class WC_Download_Handler {
 		header( 'X-Robots-Tag: noindex, nofollow', true );
 		header( 'Content-Type: ' . self::get_download_content_type( $file_path ) );
 		header( 'Content-Description: File Transfer' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '";' );
+		header( 'Content-Disposition: ' . self::get_content_disposition() . '; filename="' . $filename . '";' );
 		header( 'Content-Transfer-Encoding: binary' );
 
 		$file_size = @filesize( $file_path ); // phpcs:ignore Generic.PHP.NoSilencedErrors.Discouraged
@@ -492,6 +550,22 @@ class WC_Download_Handler {
 		} else {
 			@ob_end_clean(); // phpcs:ignore Generic.PHP.NoSilencedErrors.Discouraged
 		}
+	}
+
+    /**
+	 *
+	 * Get selected content disposition
+	 *
+	 * Defaults to attachment if `woocommerce_downloads_deliver_inline` setting is not selected.
+	 *
+	 * @return string Content disposition value.
+	 */
+	private static function get_content_disposition() : string {
+		$disposition = 'attachment';
+		if ( 'yes' === get_option( 'woocommerce_downloads_deliver_inline' ) ) {
+			$disposition = 'inline';
+		}
+		return $disposition;
 	}
 
 	/**

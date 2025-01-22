@@ -10,18 +10,16 @@
  * @version WC-2.0.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
-}
+defined( 'ABSPATH' ) || exit;
 
 global $post;
 
-$heading = esc_html( apply_filters( 'woocommerce_product_description_heading', __( 'Description', 'classic-commerce' ) ) );
+$heading = apply_filters( 'woocommerce_product_description_heading', __( 'Description', 'classic-commerce' ) );
 
 ?>
 
 <?php if ( $heading ) : ?>
-  <h2><?php echo $heading; ?></h2>
+    <h2><?php echo esc_html( $heading ); ?></h2>
 <?php endif; ?>
 
 <?php the_content(); ?>

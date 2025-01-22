@@ -132,6 +132,7 @@ abstract class WC_REST_Controller extends WP_REST_Controller {
 
 		// Get the request params.
 		$items    = array_filter( $request->get_params() );
+        $query    = $request->get_query_params();
 		$response = array();
 
 		// Check batch limit.
@@ -156,6 +157,10 @@ abstract class WC_REST_Controller extends WP_REST_Controller {
 
 				// Set request parameters.
 				$_item->set_body_params( $item );
+
+                // Set query (GET) parameters.
+				$_item->set_query_params( $query );
+                
 				$_response = $this->create_item( $_item );
 
 				if ( is_wp_error( $_response ) ) {
@@ -203,10 +208,12 @@ abstract class WC_REST_Controller extends WP_REST_Controller {
 				}
 
 				$_item = new WP_REST_Request( 'DELETE' );
-				$_item->set_query_params( array(
+				$_item->set_query_params(
+                    array(
 					'id'    => $id,
 					'force' => true,
-				) );
+				    )
+                );
 				$_response = $this->delete_item( $_item );
 
 				if ( is_wp_error( $_response ) ) {
@@ -350,7 +357,8 @@ abstract class WC_REST_Controller extends WP_REST_Controller {
 	 */
 	public function validate_setting_textarea_field( $value, $setting ) {
 		$value = is_null( $value ) ? '' : $value;
-		return wp_kses( trim( stripslashes( $value ) ),
+		return wp_kses(
+            trim( stripslashes( $value ) ),
 			array_merge(
 				array(
 					'iframe' => array(
@@ -374,7 +382,7 @@ abstract class WC_REST_Controller extends WP_REST_Controller {
 	 * @return array
 	 */
 	protected function add_meta_query( $args, $meta_query ) {
-		if ( ! empty( $args['meta_query'] ) ) {
+		if ( empty( $args['meta_query'] ) ) {
 			$args['meta_query'] = array();
 		}
 
@@ -436,6 +444,16 @@ abstract class WC_REST_Controller extends WP_REST_Controller {
 	public function get_fields_for_response( $request ) {
 		$schema = $this->get_item_schema();
 		$fields = isset( $schema['properties'] ) ? array_keys( $schema['properties'] ) : array();
+
+        $additional_fields = $this->get_additional_fields();
+		foreach ( $additional_fields as $field_name => $field_options ) {
+			// For back-compat, include any field with an empty schema
+			// because it won't be present in $this->get_item_schema().
+			if ( is_null( $field_options['schema'] ) ) {
+				$fields[] = $field_name;
+			}
+		}
+
 		if ( ! isset( $request['_fields'] ) ) {
 			return $fields;
 		}

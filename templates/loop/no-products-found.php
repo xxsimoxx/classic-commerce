@@ -7,12 +7,12 @@
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @author  WooThemes
  * @package ClassicCommerce/Templates
- * @version WC-2.0.0
+ * @version WC-7.8.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
-}
+defined( 'ABSPATH' ) || exit;
 
 ?>
-<p class="woocommerce-info"><?php _e( 'No products were found matching your selection.', 'classic-commerce' ); ?></p>
+<div class="woocommerce-no-products-found">
+	<?php wc_print_notice( esc_html__( 'No products were found matching your selection.', 'classic-commerce' ), 'notice' ); ?>
+</div>

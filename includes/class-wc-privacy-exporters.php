@@ -27,10 +27,11 @@ class WC_Privacy_Exporters {
 			$customer_personal_data = self::get_customer_personal_data( $user );
 			if ( ! empty( $customer_personal_data ) ) {
 				$data_to_export[] = array(
-					'group_id'    => 'woocommerce_customer',
-					'group_label' => __( 'Customer Data', 'classic-commerce' ),
-					'item_id'     => 'user',
-					'data'        => $customer_personal_data,
+                    'group_id'          => 'woocommerce_customer',
+					'group_label'       => __( 'Customer Data', 'classic-commerce' ),
+					'group_description' => __( 'User&#8217;s Classic Commerce customer data.', 'classic-commerce' ),
+					'item_id'           => 'user',
+					'data'              => $customer_personal_data,
 				);
 			}
 		}
@@ -71,10 +72,11 @@ class WC_Privacy_Exporters {
 		if ( 0 < count( $orders ) ) {
 			foreach ( $orders as $order ) {
 				$data_to_export[] = array(
-					'group_id'    => 'woocommerce_orders',
-					'group_label' => __( 'Orders', 'classic-commerce' ),
-					'item_id'     => 'order-' . $order->get_id(),
-					'data'        => self::get_order_personal_data( $order ),
+                    'group_id'          => 'woocommerce_orders',
+					'group_label'       => __( 'Orders', 'classic-commerce' ),
+					'group_description' => __( 'User&#8217;s Classic Commerce orders data.', 'classic-commerce' ),
+					'item_id'           => 'order-' . $order->get_id(),
+					'data'              => self::get_order_personal_data( $order ),
 				);
 			}
 			$done = 10 > count( $orders );
@@ -118,22 +120,24 @@ class WC_Privacy_Exporters {
 		if ( 0 < count( $downloads ) ) {
 			foreach ( $downloads as $download ) {
 				$data_to_export[] = array(
-					'group_id'    => 'woocommerce_downloads',
+					'group_id'          => 'woocommerce_downloads',
 					/* translators: This is the headline for a list of downloads purchased from the store for a given user. */
-					'group_label' => __( 'Purchased Downloads', 'classic-commerce' ),
-					'item_id'     => 'download-' . $download->get_id(),
-					'data'        => self::get_download_personal_data( $download ),
+					'group_label'       => __( 'Purchased Downloads', 'classic-commerce' ),
+					'group_description' => __( 'User&#8217;s Classic Commerce purchased downloads data.', 'classic-commerce' ),
+					'item_id'           => 'download-' . $download->get_id(),
+					'data'              => self::get_download_personal_data( $download )
 				);
 
 				$download_logs = $customer_download_log_data_store->get_download_logs_for_permission( $download->get_id() );
 
 				foreach ( $download_logs as $download_log ) {
 					$data_to_export[] = array(
-						'group_id'    => 'woocommerce_download_logs',
+						'group_id'          => 'woocommerce_download_logs',
 						/* translators: This is the headline for a list of access logs for downloads purchased from the store for a given user. */
-						'group_label' => __( 'Access to Purchased Downloads', 'classic-commerce' ),
-						'item_id'     => 'download-log-' . $download_log->get_id(),
-						'data'        => array(
+						'group_label'       => __( 'Access to Purchased Downloads', 'woocommerce' ),
+						'group_description' => __( 'User&#8217;s WooCommerce access to purchased downloads data.', 'woocommerce' ),
+						'item_id'           => 'download-log-' . $download_log->get_id(),
+						'data'              => array(
 							array(
 								'name'  => __( 'Download ID', 'classic-commerce' ),
 								'value' => $download_log->get_permission_id(),
@@ -184,8 +188,8 @@ class WC_Privacy_Exporters {
 			'billing_city'        => __( 'Billing City', 'classic-commerce' ),
 			'billing_postcode'    => __( 'Billing Postal/Zip Code', 'classic-commerce' ),
 			'billing_state'       => __( 'Billing State', 'classic-commerce' ),
-			'billing_country'     => __( 'Billing Country', 'classic-commerce' ),
-			'billing_phone'       => __( 'Phone Number', 'classic-commerce' ),
+			'billing_country'     => __( 'Billing Country / Region', 'classic-commerce' ),
+			'billing_phone'       => __( 'Billing Phone Number', 'classic-commerce' ),
 			'billing_email'       => __( 'Email Address', 'classic-commerce' ),
 			'shipping_first_name' => __( 'Shipping First Name', 'classic-commerce' ),
 			'shipping_last_name'  => __( 'Shipping Last Name', 'classic-commerce' ),
@@ -195,7 +199,8 @@ class WC_Privacy_Exporters {
 			'shipping_city'       => __( 'Shipping City', 'classic-commerce' ),
 			'shipping_postcode'   => __( 'Shipping Postal/Zip Code', 'classic-commerce' ),
 			'shipping_state'      => __( 'Shipping State', 'classic-commerce' ),
-			'shipping_country'    => __( 'Shipping Country', 'classic-commerce' ),
+			'shipping_country'    => __( 'Shipping Country / Region', 'classic-commerce' ),
+            'shipping_phone'      => __( 'Shipping Phone Number', 'classic-commerce' ),
 		), $customer );
 
 		foreach ( $props_to_export as $prop => $description ) {
@@ -247,6 +252,7 @@ class WC_Privacy_Exporters {
 			'formatted_shipping_address' => __( 'Shipping Address', 'classic-commerce' ),
 			'billing_phone'              => __( 'Phone Number', 'classic-commerce' ),
 			'billing_email'              => __( 'Email Address', 'classic-commerce' ),
+            'shipping_phone'             => __( 'Shipping Phone Number', 'classic-commerce' ),
 		), $order );
 
 		foreach ( $props_to_export as $prop => $name ) {
@@ -352,11 +358,11 @@ class WC_Privacy_Exporters {
 			),
 			array(
 				'name'  => __( 'Access granted', 'classic-commerce' ),
-				'value' => date( 'Y-m-d', $download->get_access_granted( 'edit' )->getTimestamp() ),
+				'value' => gmdate( 'Y-m-d', $download->get_access_granted( 'edit' )->getTimestamp() ),
 			),
 			array(
 				'name'  => __( 'Access expires', 'classic-commerce' ),
-				'value' => ! is_null( $download->get_access_expires( 'edit' ) ) ? date( 'Y-m-d', $download->get_access_expires( 'edit' )->getTimestamp() ) : null,
+				'value' => ! is_null( $download->get_access_expires( 'edit' ) ) ? gmdate( 'Y-m-d', $download->get_access_expires( 'edit' )->getTimestamp() ) : null,
 			),
 		);
 
@@ -400,10 +406,11 @@ class WC_Privacy_Exporters {
 		if ( 0 < count( $tokens ) ) {
 			foreach ( $tokens as $token ) {
 				$data_to_export[] = array(
-					'group_id'    => 'woocommerce_tokens',
-					'group_label' => __( 'Payment Tokens', 'classic-commerce' ),
-					'item_id'     => 'token-' . $token->get_id(),
-					'data'        => array(
+					'group_id'          => 'woocommerce_tokens',
+					'group_label'       => __( 'Payment Tokens', 'classic-commerce' ),
+					'group_description' => __( 'User&#8217;s Classic Commerce payment tokens data.', 'classic-commerce' ),
+					'item_id'           => 'token-' . $token->get_id(),
+					'data'              => array(
 						array(
 							'name'  => __( 'Token', 'classic-commerce' ),
 							'value' => $token->get_display_name(),

@@ -4,8 +4,8 @@
  *
  * Handles requests to the /reports/reviews/count endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.5.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.5.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Reports Reviews Totals controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Reports_Controller
  */
 class WC_REST_Report_Reviews_Totals_Controller extends WC_REST_Reports_Controller {
@@ -35,7 +35,7 @@ class WC_REST_Report_Reviews_Totals_Controller extends WC_REST_Reports_Controlle
 	/**
 	 * Get reports list.
 	 *
-	 * @since WC-3.5.0
+	 * @since 3.5.0
 	 * @return array
 	 */
 	protected function get_reports() {

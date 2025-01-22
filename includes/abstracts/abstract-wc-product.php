@@ -20,8 +20,8 @@ require_once WC_ABSPATH . 'includes/legacy/abstract-wc-legacy-product.php';
  *
  * The Classic Commerce product class handles individual product data.
  *
- * @version  WC-3.0.0
- * @package  ClassicCommerce/Abstracts
+ * @version WC-3.0.0
+ * @package ClassicCommerce/Abstracts
  */
 class WC_Product extends WC_Abstract_Legacy_Product {
 
@@ -88,6 +88,7 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 		'attributes'         => array(),
 		'default_attributes' => array(),
 		'menu_order'         => 0,
+        'post_password'      => '',
 		'virtual'            => false,
 		'downloadable'       => false,
 		'category_ids'       => array(),
@@ -146,14 +147,6 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	public function get_type() {
 		return isset( $this->product_type ) ? $this->product_type : 'simple';
 	}
-
-	/*
-	|--------------------------------------------------------------------------
-	| Getters
-	|--------------------------------------------------------------------------
-	|
-	| Methods for getting data from the product object.
-	*/
 
 	/**
 	 * Get product name.
@@ -362,7 +355,7 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 * Returns number of items available for sale.
 	 *
 	 * @param  string $context What the value is for. Valid values are view and edit.
-	 * @return int|null
+	 * @return int |null
 	 */
 	public function get_stock_quantity( $context = 'view' ) {
 		return $this->get_prop( 'stock_quantity', $context );
@@ -555,6 +548,17 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 */
 	public function get_menu_order( $context = 'view' ) {
 		return $this->get_prop( 'menu_order', $context );
+	}
+
+    /**
+	 * Get post password.
+	 *
+	 * @since  3.6.0
+	 * @param  string $context What the value is for. Valid values are view and edit.
+	 * @return int
+	 */
+	public function get_post_password( $context = 'view' ) {
+        return $this->get_prop( 'post_password', $context );
 	}
 
 	/**
@@ -774,7 +778,9 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 * @param string $visibility Options: 'hidden', 'visible', 'search' and 'catalog'.
 	 */
 	public function set_catalog_visibility( $visibility ) {
-		$options = array_keys( wc_get_product_visibility_options() );
+		$options    = array_keys( wc_get_product_visibility_options() );
+		$visibility = in_array( $visibility, $options, true ) ? $visibility : strtolower( $visibility );
+
 		if ( ! in_array( $visibility, $options, true ) ) {
 			$this->error( 'product_invalid_catalog_visibility', __( 'Invalid catalog visibility option.', 'classic-commerce' ) );
 		}
@@ -895,6 +901,8 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 		if ( empty( $status ) ) {
 			$status = 'taxable';
 		}
+
+        $status = strtolower( $status );
 
 		if ( ! in_array( $status, $options, true ) ) {
 			$this->error( 'product_invalid_tax_status', __( 'Invalid product tax status.', 'classic-commerce' ) );
@@ -1132,6 +1140,16 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 		$this->set_prop( 'menu_order', intval( $menu_order ) );
 	}
 
+    /**
+	 * Set post password.
+	 *
+	 * @since 3.6.0
+	 * @param int $post_password Post password.
+	 */
+	public function set_post_password( $post_password ) {
+		$this->set_prop( 'post_password', $post_password );
+	}
+
 	/**
 	 * Set the product categories.
 	 *
@@ -1326,19 +1344,21 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 			$this->set_stock_quantity( '' );
 			$this->set_backorders( 'no' );
 			$this->set_low_stock_amount( '' );
-
-			// If we are stock managing and we don't have stock, force out of stock status.
-		} elseif ( $this->get_stock_quantity() <= get_option( 'woocommerce_notify_no_stock_amount', 0 ) && 'no' === $this->get_backorders() ) {
-			$this->set_stock_status( 'outofstock' );
-
-			// If we are stock managing, backorders are allowed, and we don't have stock, force on backorder status.
-		} elseif ( $this->get_stock_quantity() <= get_option( 'woocommerce_notify_no_stock_amount', 0 ) && 'no' !== $this->get_backorders() ) {
-			$this->set_stock_status( 'onbackorder' );
-
-			// If the stock level is changing and we do now have enough, force in stock status.
-		} elseif ( $this->get_stock_quantity() > get_option( 'woocommerce_notify_no_stock_amount', 0 ) ) {
-			$this->set_stock_status( 'instock' );
+            return;
 		}
+
+		$stock_is_above_notification_threshold = ( $this->get_stock_quantity() > get_option( 'woocommerce_notify_no_stock_amount', 0 ) );
+		$backorders_are_allowed                = ( 'no' !== $this->get_backorders() );
+
+		if ( $stock_is_above_notification_threshold ) {
+			$new_stock_status = 'instock';
+		} elseif ( $backorders_are_allowed ) {
+			$new_stock_status = 'onbackorder';
+		} else {
+			$new_stock_status = 'outofstock';
+		}
+
+        $this->set_stock_status( $new_stock_status );
 	}
 
 	/**
@@ -1349,21 +1369,80 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 */
 	public function save() {
 		$this->validate_props();
-
-		if ( $this->data_store ) {
-			// Trigger action before saving to the DB. Use a pointer to adjust object props before save.
-			do_action( 'woocommerce_before_' . $this->object_type . '_object_save', $this, $this->data_store );
-
-			if ( $this->get_id() ) {
-				$this->data_store->update( $this );
-			} else {
-				$this->data_store->create( $this );
-			}
-			if ( $this->get_parent_id() ) {
-				wc_deferred_product_sync( $this->get_parent_id() );
-			}
+		if ( ! $this->data_store ) {
+			return $this->get_id();
 		}
+		/**
+		 * Trigger action before saving to the DB. Allows you to adjust object props before save.
+		 *
+		 * @param WC_Data          $this The object being saved.
+		 * @param WC_Data_Store_WP $data_store THe data store persisting the data.
+		 */
+		do_action( 'woocommerce_before_' . $this->object_type . '_object_save', $this, $this->data_store );
+
+		$state = $this->before_data_store_save_or_update();
+
+		if ( $this->get_id() ) {
+			$this->data_store->update( $this );
+		} else {
+			$this->data_store->create( $this );
+		}
+
+        $this->after_data_store_save_or_update( $state );
+
+		/**
+		 * Trigger action after saving to the DB.
+		 *
+		 * @param WC_Data          $this The object being saved.
+		 * @param WC_Data_Store_WP $data_store THe data store persisting the data.
+		 */
+		do_action( 'woocommerce_after_' . $this->object_type . '_object_save', $this, $this->data_store );
 		return $this->get_id();
+	}
+
+	/**
+	 * Do any extra processing needed before the actual product save
+	 * (but after triggering the 'woocommerce_before_..._object_save' action)
+	 *
+	 * @return mixed A state value that will be passed to after_data_store_save_or_update.
+	 */
+	protected function before_data_store_save_or_update() {
+	}
+
+	/**
+	 * Do any extra processing needed after the actual product save
+	 * (but before triggering the 'woocommerce_after_..._object_save' action)
+	 *
+	 * @param mixed $state The state object that was returned by before_data_store_save_or_update.
+	 */
+	protected function after_data_store_save_or_update( $state ) {
+		$this->maybe_defer_product_sync();
+	}
+
+    /**
+	 * Delete the product, set its ID to 0, and return result.
+	 *
+	 * @param  bool $force_delete Should the product be deleted permanently.
+	 * @return bool result
+	 */
+	public function delete( $force_delete = false ) {
+		$deleted = parent::delete( $force_delete );
+
+		if ( $deleted ) {
+			$this->maybe_defer_product_sync();
+		}
+
+		return $deleted;
+	}
+
+	/**
+	 * If this is a child product, queue its parent for syncing at the end of the request.
+	 */
+	protected function maybe_defer_product_sync() {
+		$parent_id = $this->get_parent_id();
+		if ( $parent_id ) {
+			wc_deferred_product_sync( $parent_id );
+		}
 	}
 
 	/*
@@ -1382,7 +1461,7 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 * @since WC-2.5.0
 	 */
 	public function supports( $feature ) {
-		return apply_filters( 'woocommerce_product_supports', in_array( $feature, $this->supports ), $feature, $this );
+		return apply_filters( 'woocommerce_product_supports', in_array( $feature, $this->supports, true ), $feature, $this );
 	}
 
 	/**
@@ -1403,7 +1482,7 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 * @return bool
 	 */
 	public function is_type( $type ) {
-		return ( $this->get_type() === $type || ( is_array( $type ) && in_array( $this->get_type(), $type ) ) );
+		return ( $this->get_type() === $type || ( is_array( $type ) && in_array( $this->get_type(), $type, true ) ) );
 	}
 
 	/**
@@ -1448,6 +1527,16 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 * @return bool
 	 */
 	public function is_visible() {
+        $visible = $this->is_visible_core();
+		return apply_filters( 'woocommerce_product_is_visible', $visible, $this->get_id() );
+	}
+
+	/**
+	 * Returns whether or not the product is visible in the catalog (doesn't trigger filters).
+	 *
+	 * @return bool
+	 */
+	protected function is_visible_core() {
 		$visible = 'visible' === $this->get_catalog_visibility() || ( is_search() && 'search' === $this->get_catalog_visibility() ) || ( ! is_search() && 'catalog' === $this->get_catalog_visibility() );
 
 		if ( 'trash' === $this->get_status() ) {
@@ -1459,7 +1548,7 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 		if ( $this->get_parent_id() ) {
 			$parent_product = wc_get_product( $this->get_parent_id() );
 
-			if ( $parent_product && 'publish' !== $parent_product->get_status() ) {
+			if ( $parent_product && 'publish' !== $parent_product->get_status() && ! current_user_can( 'edit_post', $parent_product->get_id() ) ) {
 				$visible = false;
 			}
 		}
@@ -1468,7 +1557,7 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 			$visible = false;
 		}
 
-		return apply_filters( 'woocommerce_product_is_visible', $visible, $this->get_id() );
+		return $visible;
 	}
 
 	/**
@@ -1675,7 +1764,7 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 * @return boolean
 	 */
 	public function has_options() {
-		return false;
+		return apply_filters( 'woocommerce_product_has_options', false, $this );
 	}
 
 	/*
@@ -1792,6 +1881,23 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 		return apply_filters( 'woocommerce_product_single_add_to_cart_text', __( 'Add to cart', 'classic-commerce' ), $this );
 	}
 
+    /**
+	 * Get the aria-describedby description for the add to cart button.
+	 *
+	 * @return string
+	 */
+	public function add_to_cart_aria_describedby() {
+        /**
+		 * Filter the aria-describedby description for the add to cart button.
+		 *
+		 * @since 7.8.0
+		 *
+		 * @param string $var Text for the 'aria-describedby' attribute.
+		 * @param WC_Product $this Product object.
+		 */
+		return apply_filters( 'woocommerce_product_add_to_cart_aria_describedby', '', $this );
+    }
+
 	/**
 	 * Get the add to cart button text.
 	 *
@@ -1821,15 +1927,18 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 * @return string
 	 */
 	public function get_image( $size = 'woocommerce_thumbnail', $attr = array(), $placeholder = true ) {
+        $image = '';
 		if ( $this->get_image_id() ) {
 			$image = wp_get_attachment_image( $this->get_image_id(), $size, false, $attr );
 		} elseif ( $this->get_parent_id() ) {
 			$parent_product = wc_get_product( $this->get_parent_id() );
-			$image          = $parent_product->get_image( $size, $attr, $placeholder );
-		} elseif ( $placeholder ) {
-			$image = wc_placeholder_img( $size );
-		} else {
-			$image = '';
+            if ( $parent_product ) {
+				$image = $parent_product->get_image( $size, $attr, $placeholder );
+			}
+		}
+
+		if ( ! $image && $placeholder ) {
+			$image = wc_placeholder_img( $size, $attr );
 		}
 
 		return apply_filters( 'woocommerce_product_get_image', $image, $this, $size, $attr, $placeholder, $image );
@@ -1841,7 +1950,8 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 * @return string
 	 */
 	public function get_shipping_class() {
-		if ( $class_id = $this->get_shipping_class_id() ) { // @phpcs:ignore Squiz.PHP.DisallowMultipleAssignments.Found
+        $class_id = $this->get_shipping_class_id();
+		if ( $class_id ) {
 			$term = get_term_by( 'id', $class_id, 'product_shipping_class' );
 
 			if ( $term && ! is_wp_error( $term ) ) {
@@ -1933,7 +2043,8 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	public function get_price_suffix( $price = '', $qty = 1 ) {
 		$html = '';
 
-		if ( ( $suffix = get_option( 'woocommerce_price_display_suffix' ) ) && wc_tax_enabled() && 'taxable' === $this->get_tax_status() ) { // @phpcs:ignore Squiz.PHP.DisallowMultipleAssignments.Found
+		$suffix = get_option( 'woocommerce_price_display_suffix' );
+		if ( $suffix && wc_tax_enabled() && 'taxable' === $this->get_tax_status() ) {
 			if ( '' === $price ) {
 				$price = $this->get_price();
 			}
@@ -1952,10 +2063,14 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	 * @return string[]
 	 */
 	public function get_availability() {
-		return apply_filters( 'woocommerce_get_availability', array(
-			'availability' => $this->get_availability_text(),
-			'class'        => $this->get_availability_class(),
-		), $this );
+		return apply_filters(
+            'woocommerce_get_availability',
+            array(
+                'availability' => $this->get_availability_text(),
+                'class'        => $this->get_availability_class(),
+            ),
+            $this
+        );
 	}
 
 	/**
@@ -1968,6 +2083,8 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 			$availability = __( 'Out of stock', 'classic-commerce' );
 		} elseif ( $this->managing_stock() && $this->is_on_backorder( 1 ) ) {
 			$availability = $this->backorders_require_notification() ? __( 'Available on backorder', 'classic-commerce' ) : '';
+            } elseif ( ! $this->managing_stock() && $this->is_on_backorder( 1 ) ) {
+			$availability = __( 'Available on backorder', 'classic-commerce' );
 		} elseif ( $this->managing_stock() ) {
 			$availability = wc_format_stock_for_display( $this );
 		} else {
@@ -1984,7 +2101,7 @@ class WC_Product extends WC_Abstract_Legacy_Product {
 	protected function get_availability_class() {
 		if ( ! $this->is_in_stock() ) {
 			$class = 'out-of-stock';
-		} elseif ( $this->managing_stock() && $this->is_on_backorder( 1 ) ) {
+		} elseif ( ( $this->managing_stock() && $this->is_on_backorder( 1 ) ) || ( ! $this->managing_stock() && $this->is_on_backorder( 1 ) ) ) {
 			$class = 'available-on-backorder';
 		} else {
 			$class = 'in-stock';

@@ -6,10 +6,12 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates
- * @version WC-3.5.0
+ * @version WC-9.2.0
  */
 
 defined( 'ABSPATH' ) || exit;
+
+do_action( 'woocommerce_before_reset_password_form' );
 
 ?>
 
@@ -18,12 +20,12 @@ defined( 'ABSPATH' ) || exit;
 	<p><?php echo apply_filters( 'woocommerce_reset_password_message', esc_html__( 'Enter a new password below.', 'classic-commerce' ) ); ?></p><?php // @codingStandardsIgnoreLine ?>
 
 	<p class="woocommerce-form-row woocommerce-form-row--first form-row form-row-first">
-		<label for="password_1"><?php esc_html_e( 'New password', 'classic-commerce' ); ?>&nbsp;<span class="required">*</span></label>
-		<input type="password" class="woocommerce-Input woocommerce-Input--text input-text" name="password_1" id="password_1" autocomplete="new-password" />
+		<label for="password_1"><?php esc_html_e( 'New password', 'classic-commerce' ); ?>&nbsp;<span class="required" aria-hidden="true">*</span><span class="screen-reader-text"><?php esc_html_e( 'Required', 'classic-commerce' ); ?></span></label>
+		<input type="password" class="woocommerce-Input woocommerce-Input--text input-text" name="password_1" id="password_1" autocomplete="new-password" required aria-required="true" />
 	</p>
 	<p class="woocommerce-form-row woocommerce-form-row--last form-row form-row-last">
-		<label for="password_2"><?php esc_html_e( 'Re-enter new password', 'classic-commerce' ); ?>&nbsp;<span class="required">*</span></label>
-		<input type="password" class="woocommerce-Input woocommerce-Input--text input-text" name="password_2" id="password_2" autocomplete="new-password" />
+		<label for="password_2"><?php esc_html_e( 'Re-enter new password', 'classic-commerce' ); ?>&nbsp;<span class="required" aria-hidden="true">*</span><span class="screen-reader-text"><?php esc_html_e( 'Required', 'classic-commerce' ); ?></span></label>
+		<input type="password" class="woocommerce-Input woocommerce-Input--text input-text" name="password_2" id="password_2" autocomplete="new-password" required aria-required="true" />
 	</p>
 
 	<input type="hidden" name="reset_key" value="<?php echo esc_attr( $args['key'] ); ?>" />
@@ -41,3 +43,5 @@ defined( 'ABSPATH' ) || exit;
 	<?php wp_nonce_field( 'reset_password', 'woocommerce-reset-password-nonce' ); ?>
 
 </form>
+<?php
+do_action( 'woocommerce_after_reset_password_form' );

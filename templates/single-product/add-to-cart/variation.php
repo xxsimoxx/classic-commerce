@@ -8,7 +8,7 @@
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @author  WooThemes
  * @package ClassicCommerce/Templates
- * @version WC-2.5.0
+ * @version WC-9.3.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -20,5 +20,5 @@ defined( 'ABSPATH' ) || exit;
 	<div class="woocommerce-variation-availability">{{{ data.variation.availability_html }}}</div>
 </script>
 <script type="text/template" id="tmpl-unavailable-variation-template">
-	<p><?php _e( 'Sorry, this product is unavailable. Please choose a different combination.', 'classic-commerce' ); ?></p>
+	<p role="alert"><?php esc_html_e( 'Sorry, this product is unavailable. Please choose a different combination.', 'classic-commerce' ); ?></p>
 </script>

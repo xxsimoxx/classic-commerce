@@ -19,7 +19,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @package     ClassicCommerce/Classes/Shipping
  */
 class WC_Shipping_Local_Pickup extends WC_Shipping_Method {
-
+    
+    /**
+	 * Shipping method cost.
+	 *
+	 * @var string
+	 */
+	public $cost;
+    
 	/**
 	 * Constructor.
 	 *

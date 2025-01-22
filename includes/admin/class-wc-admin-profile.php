@@ -70,11 +70,11 @@ if ( ! class_exists( 'WC_Admin_Profile', false ) ) :
 								'description' => '',
 							),
 							'billing_country'    => array(
-								'label'       => __( 'Country', 'classic-commerce' ),
+								'label'       => __( 'Country / Region', 'classic-commerce' ),
 								'description' => '',
 								'class'       => 'js_field-country',
 								'type'        => 'select',
-								'options'     => array( '' => __( 'Select a country&hellip;', 'classic-commerce' ) ) + WC()->countries->get_allowed_countries(),
+								'options'     => array( '' => __( 'Select a country / region&hellip;', 'classic-commerce' ) ) + WC()->countries->get_allowed_countries(),
 							),
 							'billing_state'      => array(
 								'label'       => __( 'State / County', 'classic-commerce' ),
@@ -130,16 +130,20 @@ if ( ! class_exists( 'WC_Admin_Profile', false ) ) :
 								'description' => '',
 							),
 							'shipping_country'    => array(
-								'label'       => __( 'Country', 'classic-commerce' ),
+								'label'       => __( 'Country / Region', 'classic-commerce' ),
 								'description' => '',
 								'class'       => 'js_field-country',
 								'type'        => 'select',
-								'options'     => array( '' => __( 'Select a country&hellip;', 'classic-commerce' ) ) + WC()->countries->get_allowed_countries(),
+								'options'     => array( '' => __( 'Select a country / region&hellip;', 'classic-commerce' ) ) + WC()->countries->get_allowed_countries(),
 							),
 							'shipping_state'      => array(
 								'label'       => __( 'State / County', 'classic-commerce' ),
 								'description' => __( 'State / County or state code', 'classic-commerce' ),
 								'class'       => 'js_field-state',
+							),
+                            'shipping_phone'      => array(
+								'label'       => __( 'Phone', 'classic-commerce' ),
+								'description' => '',
 							),
 						),
 					),
@@ -154,7 +158,7 @@ if ( ! class_exists( 'WC_Admin_Profile', false ) ) :
 		 * @param WP_User $user
 		 */
 		public function add_customer_meta_fields( $user ) {
-			if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			if ( ! apply_filters( 'woocommerce_current_user_can_edit_customer_meta_fields', current_user_can( 'manage_woocommerce' ), $user->ID ) ) {
 				return;
 			}
 
@@ -171,12 +175,12 @@ if ( ! class_exists( 'WC_Admin_Profile', false ) ) :
 							</th>
 							<td>
 								<?php if ( ! empty( $field['type'] ) && 'select' === $field['type'] ) : ?>
-									<select name="<?php echo esc_attr( $key ); ?>" id="<?php echo esc_attr( $key ); ?>" class="<?php echo esc_attr( $field['class'] ); ?>" style="width: 25em;">
+									<select name="<?php echo esc_attr( $key ); ?>" id="<?php echo esc_attr( $key ); ?>" class="<?php echo isset( $field['class'] ) ? esc_attr( $field['class'] ) : ''; ?>" style="width: 25em;">
 										<?php
 											$selected = esc_attr( get_user_meta( $user->ID, $key, true ) );
 										foreach ( $field['options'] as $option_key => $option_value ) :
 											?>
-											<option value="<?php echo esc_attr( $option_key ); ?>" <?php selected( $selected, $option_key, true ); ?>><?php echo esc_attr( $option_value ); ?></option>
+											<option value="<?php echo esc_attr( $option_key ); ?>" <?php selected( $selected, $option_key, true ); ?>><?php echo esc_html( $option_value ); ?></option>
 										<?php endforeach; ?>
 									</select>
 								<?php elseif ( ! empty( $field['type'] ) && 'checkbox' === $field['type'] ) : ?>
@@ -186,8 +190,7 @@ if ( ! class_exists( 'WC_Admin_Profile', false ) ) :
 								<?php else : ?>
 									<input type="text" name="<?php echo esc_attr( $key ); ?>" id="<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $this->get_user_meta( $user->ID, $key ) ); ?>" class="<?php echo ( ! empty( $field['class'] ) ? esc_attr( $field['class'] ) : 'regular-text' ); ?>" />
 								<?php endif; ?>
-								<br/>
-								<span class="description"><?php echo wp_kses_post( $field['description'] ); ?></span>
+								<p class="description"><?php echo wp_kses_post( $field['description'] ); ?></p>
 							</td>
 						</tr>
 					<?php endforeach; ?>
@@ -202,9 +205,14 @@ if ( ! class_exists( 'WC_Admin_Profile', false ) ) :
 		 * @param int $user_id User ID of the user being saved
 		 */
 		public function save_customer_meta_fields( $user_id ) {
+
+            if ( ! apply_filters( 'woocommerce_current_user_can_edit_customer_meta_fields', current_user_can( 'manage_woocommerce' ), $user_id ) ) {
+				return;
+			}
+            
 			$save_fields = $this->get_customer_meta_fields();
 
-			foreach ( $save_fields as $fieldset ) {
+			foreach ( $save_fields as $fieldset_type => $fieldset ) {
 
 				foreach ( $fieldset['fields'] as $key => $field ) {
 
@@ -214,6 +222,25 @@ if ( ! class_exists( 'WC_Admin_Profile', false ) ) :
 						update_user_meta( $user_id, $key, wc_clean( $_POST[ $key ] ) );
 					}
 				}
+
+                // Skip firing the action for any non-internal fieldset types.
+				if ( ! in_array( $fieldset_type, array( 'billing', 'shipping' ), true ) ) {
+					continue;
+				}
+
+				// Fieldset type is an internal address type.
+				$address_type = $fieldset_type;
+
+				/**
+				 * Hook: woocommerce_customer_save_address.
+				 *
+				 * Fires after a customer address has been saved on the user profile admin screen.
+				 *
+				 * @since WC-8.5.0
+				 * @param int    $user_id User ID being saved.
+				 * @param string $address_type Type of address; 'billing' or 'shipping'.
+				 */
+				do_action( 'woocommerce_customer_save_address', $user_id, $address_type );
 			}
 		}
 

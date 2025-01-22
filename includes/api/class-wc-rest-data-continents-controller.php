@@ -4,8 +4,8 @@
  *
  * Handles requests to the /data/continents endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.5.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.5.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Data continents controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Controller
  */
 class WC_REST_Data_Continents_Controller extends WC_REST_Data_Controller {
@@ -35,11 +35,13 @@ class WC_REST_Data_Continents_Controller extends WC_REST_Data_Controller {
 	/**
 	 * Register routes.
 	 *
-	 * @since WC-3.5.0
+	 * @since 3.5.0
 	 */
 	public function register_routes() {
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base, array(
+			$this->namespace,
+			'/' . $this->rest_base,
+			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
 					'callback'            => array( $this, 'get_items' ),
@@ -49,7 +51,9 @@ class WC_REST_Data_Continents_Controller extends WC_REST_Data_Controller {
 			)
 		);
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base . '/(?P<location>[\w-]+)', array(
+			$this->namespace,
+			'/' . $this->rest_base . '/(?P<location>[\w-]+)',
+			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
 					'callback'            => array( $this, 'get_item' ),
@@ -69,12 +73,12 @@ class WC_REST_Data_Continents_Controller extends WC_REST_Data_Controller {
 	/**
 	 * Return the list of countries and states for a given continent.
 	 *
-	 * @since  WC-3.5.0
+	 * @since  3.5.0
 	 * @param  string          $continent_code Continent code.
 	 * @param  WP_REST_Request $request        Request data.
 	 * @return array|mixed Response data, ready for insertion into collection data.
 	 */
-	public function get_continent( $continent_code = false, $request ) {
+	public function get_continent( $continent_code, $request ) {
 		$continents  = WC()->countries->get_continents();
 		$countries   = WC()->countries->get_countries();
 		$states      = WC()->countries->get_states();
@@ -104,7 +108,8 @@ class WC_REST_Data_Continents_Controller extends WC_REST_Data_Controller {
 				if ( array_key_exists( $country_code, $locale_info ) ) {
 					// Defensive programming against unexpected changes in locale-info.php.
 					$country_data = wp_parse_args(
-						$locale_info[ $country_code ], array(
+						$locale_info[ $country_code ],
+						array(
 							'currency_code'  => 'USD',
 							'currency_pos'   => 'left',
 							'decimal_sep'    => '.',
@@ -155,7 +160,7 @@ class WC_REST_Data_Continents_Controller extends WC_REST_Data_Controller {
 	/**
 	 * Return the list of states for all continents.
 	 *
-	 * @since  WC-3.5.0
+	 * @since  3.5.0
 	 * @param  WP_REST_Request $request Request data.
 	 * @return WP_Error|WP_REST_Response
 	 */
@@ -175,7 +180,7 @@ class WC_REST_Data_Continents_Controller extends WC_REST_Data_Controller {
 	/**
 	 * Return the list of locations for a given continent.
 	 *
-	 * @since  WC-3.5.0
+	 * @since  3.5.0
 	 * @param  WP_REST_Request $request Request data.
 	 * @return WP_Error|WP_REST_Response
 	 */
@@ -190,7 +195,7 @@ class WC_REST_Data_Continents_Controller extends WC_REST_Data_Controller {
 	/**
 	 * Prepare the data object for response.
 	 *
-	 * @since  WC-3.5.0
+	 * @since  3.5.0
 	 * @param object          $item Data object.
 	 * @param WP_REST_Request $request Request object.
 	 * @return WP_REST_Response $response Response data.
@@ -236,7 +241,7 @@ class WC_REST_Data_Continents_Controller extends WC_REST_Data_Controller {
 	/**
 	 * Get the location schema, conforming to JSON Schema.
 	 *
-	 * @since  WC-3.5.0
+	 * @since  3.5.0
 	 * @return array
 	 */
 	public function get_item_schema() {

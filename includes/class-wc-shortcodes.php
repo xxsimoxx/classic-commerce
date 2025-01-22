@@ -174,7 +174,10 @@ class WC_Shortcodes {
 			'child_of'   => $atts['parent'],
 		);
 
-		$product_categories = get_terms( 'product_cat', $args );
+		$product_categories = apply_filters(
+			'woocommerce_product_categories',
+			get_terms( 'product_cat', $args )
+		);
 
 		if ( '' !== $atts['parent'] ) {
 			$product_categories = wp_list_filter( $product_categories, array(
@@ -214,7 +217,7 @@ class WC_Shortcodes {
 			woocommerce_product_loop_end();
 		}
 
-		woocommerce_reset_loop();
+		wc_reset_loop();
 
 		return '<div class="woocommerce columns-' . $columns . '">' . ob_get_clean() . '</div>';
 	}
@@ -467,54 +470,83 @@ class WC_Shortcodes {
 		if ( empty( $atts ) ) {
 			return '';
 		}
-
 		if ( ! isset( $atts['id'] ) && ! isset( $atts['sku'] ) ) {
 			return '';
 		}
+		$product_id = isset( $atts['id'] ) ? absint( $atts['id'] ) : 0;
+		if ( ! $product_id && isset( $atts['sku'] ) ) {
+			$product_id = wc_get_product_id_by_sku( $atts['sku'] );
+		}
+		$product_status = empty( $atts['status'] ) ? 'publish' : $atts['status'];
+		/**
+		 * Filters the list of invalid statuses for the `product_page` shortcode.
+		 *
+		 * @since 8.6.0
+		 * @param array $invalid_statuses List of invalid statuses.
+		 * @param int   $product_id       Product ID.
+		 * @return array
+		 */
+		$invalid_statuses = apply_filters( 'woocommerce_shortcode_product_page_invalid_statuses', array( 'trash' ), $product_id );
+		if ( in_array( $product_status, $invalid_statuses, true ) ) {
+			return '';
+		}
+		/**
+		 * Filters whether to override read permissions for unpublished products.
+		 *
+		 * @since 8.6.0
+		 * @param bool   $force_rendering Whether to override read permissions for unpublished products. `true` to force rendering the product page, `false` to block rendering, or `null` to use the default behavior.
+		 * @param int    $product_id                Product ID.
+		 * @return bool
+		 */
+		$force_rendering = apply_filters( 'woocommerce_shortcode_product_page_force_rendering', null, $product_id );
+		if ( isset( $force_rendering ) && ! $force_rendering ) {
+			return '';
+		}
 
-		$args = array(
+        $args = array(
 			'posts_per_page'      => 1,
 			'post_type'           => 'product',
-			'post_status'         => ( ! empty( $atts['status'] ) ) ? $atts['status'] : 'publish',
+			'post_status'         => $product_status,
 			'ignore_sticky_posts' => 1,
 			'no_found_rows'       => 1,
 		);
-
 		if ( isset( $atts['sku'] ) ) {
 			$args['meta_query'][] = array(
 				'key'     => '_sku',
 				'value'   => sanitize_text_field( $atts['sku'] ),
 				'compare' => '=',
 			);
-
 			$args['post_type'] = array( 'product', 'product_variation' );
 		}
-
 		if ( isset( $atts['id'] ) ) {
 			$args['p'] = absint( $atts['id'] );
 		}
-
 		// Don't render titles if desired.
 		if ( isset( $atts['show_title'] ) && ! $atts['show_title'] ) {
 			remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_title', 5 );
 		}
-
 		// Change form action to avoid redirect.
 		add_filter( 'woocommerce_add_to_cart_form_action', '__return_empty_string' );
 
 		$single_product = new WP_Query( $args );
 
+		if (
+			! isset( $force_rendering ) &&
+			$single_product->have_posts() &&
+            'publish' !== $single_product->post->post_status &&
+			! current_user_can( 'read_product', $single_product->post->ID )
+		) {
+			return '';
+		}
+
 		$preselected_id = '0';
 
 		// Check if sku is a variation.
 		if ( isset( $atts['sku'] ) && $single_product->have_posts() && 'product_variation' === $single_product->post->post_type ) {
-
-			$variation  = new WC_Product_Variation( $single_product->post->ID );
+			$variation  = wc_get_product_object( 'variation', $single_product->post->ID );
 			$attributes = $variation->get_attributes();
-
 			// Set preselected id to be used by JS to provide context.
 			$preselected_id = $single_product->post->ID;
-
 			// Get the parent product object.
 			$args = array(
 				'posts_per_page'      => 1,
@@ -524,36 +556,28 @@ class WC_Shortcodes {
 				'no_found_rows'       => 1,
 				'p'                   => $single_product->post->post_parent,
 			);
-
 			$single_product = new WP_Query( $args );
-		?>
+			?>
 			<script type="text/javascript">
-				jQuery( document ).ready( function( $ ) {
+				jQuery( function( $ ) {
 					var $variations_form = $( '[data-product-page-preselected-id="<?php echo esc_attr( $preselected_id ); ?>"]' ).find( 'form.variations_form' );
-
 					<?php foreach ( $attributes as $attr => $value ) { ?>
 						$variations_form.find( 'select[name="<?php echo esc_attr( $attr ); ?>"]' ).val( '<?php echo esc_js( $value ); ?>' );
 					<?php } ?>
 				});
 			</script>
-		<?php
+			<?php
 		}
-
 		// For "is_single" to always make load comments_template() for reviews.
 		$single_product->is_single = true;
-
 		ob_start();
-
 		global $wp_query;
-
 		// Backup query object so following loops think this is a product page.
 		$previous_wp_query = $wp_query;
 		// @codingStandardsIgnoreStart
 		$wp_query          = $single_product;
 		// @codingStandardsIgnoreEnd
-
 		wp_enqueue_script( 'wc-single-product' );
-
 		while ( $single_product->have_posts() ) {
 			$single_product->the_post()
 			?>
@@ -562,20 +586,16 @@ class WC_Shortcodes {
 			</div>
 			<?php
 		}
-
 		// Restore $previous_wp_query and reset post data.
 		// @codingStandardsIgnoreStart
 		$wp_query = $previous_wp_query;
 		// @codingStandardsIgnoreEnd
 		wp_reset_postdata();
-
 		// Re-enable titles if they were removed.
 		if ( isset( $atts['show_title'] ) && ! $atts['show_title'] ) {
 			add_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_title', 5 );
 		}
-
 		remove_filter( 'woocommerce_add_to_cart_form_action', '__return_empty_string' );
-
 		return '<div class="woocommerce">' . ob_get_clean() . '</div>';
 	}
 

@@ -5,18 +5,23 @@
  * @class    WC_Admin_Taxonomies
  * @version  WC-2.3.10
  * @package  ClassicCommerce/Admin
- * @category Class
- * @author   WooThemes
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+	exit; // Exit if accessed directly.
 }
 
 /**
  * WC_Admin_Taxonomies class.
  */
 class WC_Admin_Taxonomies {
+
+    /**
+	 * Class instance.
+	 *
+	 * @var WC_Admin_Taxonomies instance
+	 */
+	protected static $instance = false;
 
 	/**
 	 * Default category ID.
@@ -25,6 +30,16 @@ class WC_Admin_Taxonomies {
 	 */
 	private $default_cat_id = 0;
 
+    /**
+	 * Get class instance
+	 */
+	public static function get_instance() {
+		if ( ! self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
 	/**
 	 * Constructor.
 	 */
@@ -32,25 +47,24 @@ class WC_Admin_Taxonomies {
 		// Default category ID.
 		$this->default_cat_id = get_option( 'default_product_cat', 0 );
 
-		// Category/term ordering
+		// Category/term ordering.
 		add_action( 'create_term', array( $this, 'create_term' ), 5, 3 );
-		add_action( 'delete_term', array( $this, 'delete_term' ), 5 );
 
 		// Add form
 		add_action( 'product_cat_add_form_fields', array( $this, 'add_category_fields' ) );
-		add_action( 'product_cat_edit_form_fields', array( $this, 'edit_category_fields' ), 10 );
+		add_action( 'product_caesc_html_edit_form_fields', array( $this, 'edit_category_fields' ), 10 );
 		add_action( 'created_term', array( $this, 'save_category_fields' ), 10, 3 );
 		add_action( 'edit_term', array( $this, 'save_category_fields' ), 10, 3 );
 
-		// Add columns
-		add_filter( 'manage_edit-product_cat_columns', array( $this, 'product_cat_columns' ) );
+		// Add columns.
+		add_filter( 'managesc_html_edit-product_cat_columns', array( $this, 'product_cat_columns' ) );
 		add_filter( 'manage_product_cat_custom_column', array( $this, 'product_cat_column' ), 10, 3 );
 
 		// Add row actions.
 		add_filter( 'product_cat_row_actions', array( $this, 'product_cat_row_actions' ), 10, 2 );
 		add_filter( 'admin_init', array( $this, 'handle_product_cat_row_actions' ) );
 
-		// Taxonomy page descriptions
+		// Taxonomy page descriptions.
 		add_action( 'product_cat_pre_add_form', array( $this, 'product_cat_description' ) );
 		add_action( 'after-product_cat-table', array( $this, 'product_cat_notes' ) );
 
@@ -62,19 +76,19 @@ class WC_Admin_Taxonomies {
 			}
 		}
 
-		// Maintain hierarchy of terms
+		// Maintain hierarchy of terms.
 		add_filter( 'wp_terms_checklist_args', array( $this, 'disable_checked_ontop' ) );
 
-		// Admin footer scripts for this product categories admin screen
+		// Admin footer scripts for this product categories admin screen.
 		add_action( 'admin_footer', array( $this, 'scripts_at_product_cat_screen_footer' ) );
 	}
 
 	/**
 	 * Order term when created (put in position 0).
 	 *
-	 * @param mixed  $term_id
-	 * @param mixed  $tt_id
-	 * @param string $taxonomy
+	 * @param mixed  $term_id Term ID.
+	 * @param mixed  $tt_id Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy slug.
 	 */
 	public function create_term( $term_id, $tt_id = '', $taxonomy = '' ) {
 		if ( 'product_cat' != $taxonomy && ! taxonomy_is_product_attribute( $taxonomy ) ) {
@@ -83,22 +97,18 @@ class WC_Admin_Taxonomies {
 
 		$meta_name = taxonomy_is_product_attribute( $taxonomy ) ? 'order_' . esc_attr( $taxonomy ) : 'order';
 
-		update_woocommerce_term_meta( $term_id, $meta_name, 0 );
+		update_term_meta( $term_id, 'order', 0 );
 	}
 
 	/**
 	 * When a term is deleted, delete its meta.
 	 *
-	 * @param mixed $term_id
+     * @deprecated 3.6.0 No longer needed.
+     *
+	 * @param mixed $term_id Term ID.
 	 */
 	public function delete_term( $term_id ) {
-		global $wpdb;
-
-		$term_id = absint( $term_id );
-
-		if ( $term_id && get_option( 'db_version' ) < 34370 ) {
-			$wpdb->delete( $wpdb->woocommerce_termmeta, array( 'woocommerce_term_id' => $term_id ), array( '%d' ) );
-		}
+		wc_deprecated_function( 'delete_term', '3.6' );
 	}
 
 	/**
@@ -107,21 +117,21 @@ class WC_Admin_Taxonomies {
 	public function add_category_fields() {
 		?>
 		<div class="form-field term-display-type-wrap">
-			<label for="display_type"><?php _e( 'Display type', 'classic-commerce' ); ?></label>
+			<label for="display_type"><?php esc_html_e( 'Display type', 'classic-commerce' ); ?></label>
 			<select id="display_type" name="display_type" class="postform">
-				<option value=""><?php _e( 'Default', 'classic-commerce' ); ?></option>
-				<option value="products"><?php _e( 'Products', 'classic-commerce' ); ?></option>
-				<option value="subcategories"><?php _e( 'Subcategories', 'classic-commerce' ); ?></option>
-				<option value="both"><?php _e( 'Both', 'classic-commerce' ); ?></option>
+				<option value=""><?php esc_html_e( 'Default', 'classic-commerce' ); ?></option>
+				<option value="products"><?php esc_html_e( 'Products', 'classic-commerce' ); ?></option>
+				<option value="subcategories"><?php esc_html_e( 'Subcategories', 'classic-commerce' ); ?></option>
+				<option value="both"><?php esc_html_e( 'Both', 'classic-commerce' ); ?></option>
 			</select>
 		</div>
 		<div class="form-field term-thumbnail-wrap">
-			<label><?php _e( 'Thumbnail', 'classic-commerce' ); ?></label>
+			<label><?php esc_html_e( 'Thumbnail', 'classic-commerce' ); ?></label>
 			<div id="product_cat_thumbnail" style="float: left; margin-right: 10px;"><img src="<?php echo esc_url( wc_placeholder_img_src() ); ?>" width="60px" height="60px" /></div>
 			<div style="line-height: 60px;">
 				<input type="hidden" id="product_cat_thumbnail_id" name="product_cat_thumbnail_id" />
-				<button type="button" class="upload_image_button button"><?php _e( 'Upload/Add image', 'classic-commerce' ); ?></button>
-				<button type="button" class="remove_image_button button"><?php _e( 'Remove image', 'classic-commerce' ); ?></button>
+				<button type="button" class="upload_image_button button"><?php esc_html_e( 'Upload/Add image', 'classic-commerce' ); ?></button>
+				<button type="button" class="remove_image_button button"><?php esc_html_e( 'Remove image', 'classic-commerce' ); ?></button>
 			</div>
 			<script type="text/javascript">
 
@@ -145,9 +155,9 @@ class WC_Admin_Taxonomies {
 
 					// Create the media frame.
 					file_frame = wp.media.frames.downloadable_file = wp.media({
-						title: '<?php _e( 'Choose an image', 'classic-commerce' ); ?>',
+						title: '<?php esc_html_e( 'Choose an image', 'classic-commerce' ); ?>',
 						button: {
-							text: '<?php _e( 'Use image', 'classic-commerce' ); ?>'
+							text: '<?php esc_html_e( 'Use image', 'classic-commerce' ); ?>'
 						},
 						multiple: false
 					});
@@ -200,12 +210,12 @@ class WC_Admin_Taxonomies {
 	/**
 	 * Edit category thumbnail field.
 	 *
-	 * @param mixed $term Term (category) being edited
+	 * @param mixed $term Term (category) being edited.
 	 */
 	public function edit_category_fields( $term ) {
 
-		$display_type = get_woocommerce_term_meta( $term->term_id, 'display_type', true );
-		$thumbnail_id = absint( get_woocommerce_term_meta( $term->term_id, 'thumbnail_id', true ) );
+		$display_type = get_term_meta( $term->term_id, 'display_type', true );
+		$thumbnail_id = absint( get_term_meta( $term->term_id, 'thumbnail_id', true ) );
 
 		if ( $thumbnail_id ) {
 			$image = wp_get_attachment_thumb_url( $thumbnail_id );
@@ -214,24 +224,24 @@ class WC_Admin_Taxonomies {
 		}
 		?>
 		<tr class="form-field term-display-type-wrap">
-			<th scope="row" valign="top"><label><?php _e( 'Display type', 'classic-commerce' ); ?></label></th>
+			<th scope="row" valign="top"><label><?php esc_html_e( 'Display type', 'classic-commerce' ); ?></label></th>
 			<td>
 				<select id="display_type" name="display_type" class="postform">
-					<option value="" <?php selected( '', $display_type ); ?>><?php _e( 'Default', 'classic-commerce' ); ?></option>
-					<option value="products" <?php selected( 'products', $display_type ); ?>><?php _e( 'Products', 'classic-commerce' ); ?></option>
-					<option value="subcategories" <?php selected( 'subcategories', $display_type ); ?>><?php _e( 'Subcategories', 'classic-commerce' ); ?></option>
-					<option value="both" <?php selected( 'both', $display_type ); ?>><?php _e( 'Both', 'classic-commerce' ); ?></option>
+					<option value="" <?php selected( '', $display_type ); ?>><?php esc_html_e( 'Default', 'classic-commerce' ); ?></option>
+					<option value="products" <?php selected( 'products', $display_type ); ?>><?php esc_html_e( 'Products', 'classic-commerce' ); ?></option>
+					<option value="subcategories" <?php selected( 'subcategories', $display_type ); ?>><?php esc_html_e( 'Subcategories', 'classic-commerce' ); ?></option>
+					<option value="both" <?php selected( 'both', $display_type ); ?>><?php esc_html_e( 'Both', 'classic-commerce' ); ?></option>
 				</select>
 			</td>
 		</tr>
 		<tr class="form-field term-thumbnail-wrap">
-			<th scope="row" valign="top"><label><?php _e( 'Thumbnail', 'classic-commerce' ); ?></label></th>
+			<th scope="row" valign="top"><label><?php esc_html_e( 'Thumbnail', 'classic-commerce' ); ?></label></th>
 			<td>
 				<div id="product_cat_thumbnail" style="float: left; margin-right: 10px;"><img src="<?php echo esc_url( $image ); ?>" width="60px" height="60px" /></div>
 				<div style="line-height: 60px;">
 					<input type="hidden" id="product_cat_thumbnail_id" name="product_cat_thumbnail_id" value="<?php echo $thumbnail_id; ?>" />
-					<button type="button" class="upload_image_button button"><?php _e( 'Upload/Add image', 'classic-commerce' ); ?></button>
-					<button type="button" class="remove_image_button button"><?php _e( 'Remove image', 'classic-commerce' ); ?></button>
+					<button type="button" class="upload_image_button button"><?php esc_html_e( 'Upload/Add image', 'classic-commerce' ); ?></button>
+					<button type="button" class="remove_image_button button"><?php esc_html_e( 'Remove image', 'classic-commerce' ); ?></button>
 				</div>
 				<script type="text/javascript">
 
@@ -255,9 +265,9 @@ class WC_Admin_Taxonomies {
 
 						// Create the media frame.
 						file_frame = wp.media.frames.downloadable_file = wp.media({
-							title: '<?php _e( 'Choose an image', 'classic-commerce' ); ?>',
+							title: '<?php esc_html_e( 'Choose an image', 'classic-commerce' ); ?>',
 							button: {
-								text: '<?php _e( 'Use image', 'classic-commerce' ); ?>'
+								text: '<?php esc_html_e( 'Use image', 'classic-commerce' ); ?>'
 							},
 							multiple: false
 						});
@@ -291,18 +301,18 @@ class WC_Admin_Taxonomies {
 	}
 
 	/**
-	 * save_category_fields function.
+	 * save_category_fields.
 	 *
 	 * @param mixed  $term_id Term ID being saved
-	 * @param mixed  $tt_id
-	 * @param string $taxonomy
+	 * @param mixed  $tt_id Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy slug.
 	 */
 	public function save_category_fields( $term_id, $tt_id = '', $taxonomy = '' ) {
-		if ( isset( $_POST['display_type'] ) && 'product_cat' === $taxonomy ) {
-			update_woocommerce_term_meta( $term_id, 'display_type', esc_attr( $_POST['display_type'] ) );
+		if ( isset( $_POST['display_type'] ) && 'product_cat' === $taxonomy ) { // WPCS: CSRF ok, input var ok.
+			update_term_meta( $term_id, 'display_type', esc_attr( $_POST['display_type'] ) ); // WPCS: CSRF ok, sanitization ok, input var ok.
 		}
-		if ( isset( $_POST['product_cat_thumbnail_id'] ) && 'product_cat' === $taxonomy ) {
-			update_woocommerce_term_meta( $term_id, 'thumbnail_id', absint( $_POST['product_cat_thumbnail_id'] ) );
+		if ( isset( $_POST['product_cat_thumbnail_id'] ) && 'product_cat' === $taxonomy ) { // WPCS: CSRF ok, input var ok.
+			update_term_meta( $term_id, 'thumbnail_id', absint( $_POST['product_cat_thumbnail_id'] ) ); // WPCS: CSRF ok, input var ok.
 		}
 	}
 
@@ -310,7 +320,10 @@ class WC_Admin_Taxonomies {
 	 * Description for product_cat page to aid users.
 	 */
 	public function product_cat_description() {
-		echo wpautop( __( 'Product categories for your store can be managed here. To change the order of categories on the front-end you can drag and drop to sort them. To see more categories listed click the "screen options" link at the top-right of this page.', 'classic-commerce' ) );
+		echo wp_kses(
+			wpautop( __( 'Product categories for your store can be managed here. To change the order of categories on the front-end you can drag and drop to sort them. To see more categories listed click the "screen options" link at the top-right of this page.', 'classic-commerce' ) ),
+			array( 'p' => array() )
+		);
 	}
 
 	/**
@@ -323,11 +336,11 @@ class WC_Admin_Taxonomies {
 		?>
 		<div class="form-wrap edit-term-notes">
 			<p>
-				<strong><?php _e( 'Note:', 'classic-commerce' ); ?></strong><br>
+				<strong><?php esc_html_e( 'Note:', 'classic-commerce' ); ?></strong><br>
 				<?php
 					printf(
 						/* translators: %s: default category */
-						__( 'Deleting a category does not delete the products in that category. Instead, products that were only assigned to the deleted category are set to the category %s.', 'classic-commerce' ),
+						esc_html__( 'Deleting a category does not delete the products in that category. Instead, products that were only assigned to the deleted category are set to the category %s.', 'classic-commerce' ),
 						'<strong>' . esc_html( $category_name ) . '</strong>'
 					);
 				?>
@@ -340,13 +353,16 @@ class WC_Admin_Taxonomies {
 	 * Description for shipping class page to aid users.
 	 */
 	public function product_attribute_description() {
-		echo wpautop( __( 'Attribute terms can be assigned to products and variations.<br/><br/><b>Note</b>: Deleting a term will remove it from all products and variations to which it has been assigned. Recreating a term will not automatically assign it back to products.', 'classic-commerce' ) );
+		echo wp_kses(
+			wpautop( __( 'Attribute terms can be assigned to products and variations.<br/><br/><b>Note</b>: Deleting a term will remove it from all products and variations to which it has been assigned. Recreating a term will not automatically assign it back to products.', 'classic-commerce' ) ),
+			array( 'p' => array() )
+		);
 	}
 
 	/**
 	 * Thumbnail column added to category admin.
 	 *
-	 * @param mixed $columns
+	 * @param mixed $columns Columns array.
 	 * @return array
 	 */
 	public function product_cat_columns( $columns ) {
@@ -372,13 +388,13 @@ class WC_Admin_Taxonomies {
 	 * @param object $term Term object.
 	 * @return array
 	 */
-	public function product_cat_row_actions( $actions = array(), $term ) {
+	public function product_cat_row_actions( $actions, $term ) {
 		$default_category_id = absint( get_option( 'default_product_cat', 0 ) );
 
 		if ( $default_category_id !== $term->term_id && current_user_can( 'edit_term', $term->term_id ) ) {
 			$actions['make_default'] = sprintf(
 				'<a href="%s" aria-label="%s">%s</a>',
-				wp_nonce_url( 'edit-tags.php?action=make_default&amp;taxonomy=product_cat&amp;tag_ID=' . absint( $term->term_id ), 'make_default_' . absint( $term->term_id ) ),
+				wp_nonce_url( 'edit-tags.php?action=make_default&amp;taxonomy=product_cat&amp;post_type=product&amp;tag_ID=' . absint( $term->term_id ), 'make_default_' . absint( $term->term_id ) ),
 				/* translators: %s: taxonomy term name */
 				esc_attr( sprintf( __( 'Make &#8220;%s&#8221; the default category', 'classic-commerce' ), $term->name ) ),
 				__( 'Make default', 'classic-commerce' )
@@ -392,10 +408,10 @@ class WC_Admin_Taxonomies {
 	 * Handle custom row actions.
 	 */
 	public function handle_product_cat_row_actions() {
-		if ( isset( $_GET['action'], $_GET['tag_ID'], $_GET['_wpnonce'] ) && 'make_default' === $_GET['action'] ) {
-			$make_default_id = absint( $_GET['tag_ID'] );
+            if ( isset( $_GET['action'], $_GET['tag_ID'], $_GET['_wpnonce'] ) && 'make_default' === $_GET['action'] ) { // WPCS: CSRF ok, input var ok.
+			$make_default_id = absint( $_GET['tag_ID'] ); // WPCS: Input var ok.
 
-			if ( wp_verify_nonce( $_GET['_wpnonce'], 'make_default_' . $make_default_id ) && current_user_can( 'edit_term', $make_default_id ) ) {
+			if ( wp_verify_nonce( $_GET['_wpnonce'], 'make_default_' . $make_default_id ) && current_user_can( 'edit_term', $make_default_id ) ) { // WPCS: Sanitization ok, input var ok, CSRF ok.
 				update_option( 'default_product_cat', $make_default_id );
 			}
 		}
@@ -404,9 +420,9 @@ class WC_Admin_Taxonomies {
 	/**
 	 * Thumbnail column value added to category admin.
 	 *
-	 * @param string $columns
-	 * @param string $column
-	 * @param int    $id
+	 * @param string $columns Column HTML output.
+	 * @param string $column Column name.
+	 * @param int    $id Product ID.
 	 *
 	 * @return string
 	 */
@@ -419,7 +435,7 @@ class WC_Admin_Taxonomies {
 				$columns .= wc_help_tip( __( 'This is the default category and it cannot be deleted. It will be automatically assigned to products with no category.', 'classic-commerce' ) );
 			}
 
-			$thumbnail_id = get_woocommerce_term_meta( $id, 'thumbnail_id', true );
+			$thumbnail_id = get_term_meta( $id, 'thumbnail_id', true );
 
 			if ( $thumbnail_id ) {
 				$image = wp_get_attachment_thumb_url( $thumbnail_id );
@@ -427,7 +443,7 @@ class WC_Admin_Taxonomies {
 				$image = wc_placeholder_img_src();
 			}
 
-			// Prevent esc_url from breaking spaces in urls for image embeds. Ref: https://core.trac.wordpress.org/ticket/23605
+			// Prevent esc_url from breaking spaces in urls for image embeds. Ref: https://core.trac.wordpress.org/ticket/23605.
 			$image    = str_replace( ' ', '%20', $image );
 			$columns .= '<img src="' . esc_url( $image ) . '" alt="' . esc_attr__( 'Thumbnail', 'classic-commerce' ) . '" class="wp-post-image" height="48" width="48" />';
 		}
@@ -440,7 +456,7 @@ class WC_Admin_Taxonomies {
 	/**
 	 * Maintain term hierarchy when editing a product.
 	 *
-	 * @param  array $args
+	 * @param  array $argss Term checklist args.
 	 * @return array
 	 */
 	public function disable_checked_ontop( $args ) {
@@ -456,19 +472,19 @@ class WC_Admin_Taxonomies {
 	 * @return void
 	 */
 	public function scripts_at_product_cat_screen_footer() {
-		if ( ! isset( $_GET['taxonomy'] ) || 'product_cat' !== $_GET['taxonomy'] ) {
+		if ( ! isset( $_GET['taxonomy'] ) || 'product_cat' !== $_GET['taxonomy'] ) { // WPCS: CSRF ok, input var ok.
 			return;
 		}
-		// Ensure the tooltip is displayed when the image column is disabled on product categories
-		wc_enqueue_js("
-			(function( $ ) {
+		// Ensure the tooltip is displayed when the image column is disabled on product categories.
+		wc_enqueue_js(
+			"(function( $ ) {
 				'use strict';
 				var product_cat = $( 'tr#tag-" . absint( $this->default_cat_id ) . "' );
 				product_cat.find( 'th' ).empty();
 				product_cat.find( 'td.thumb span' ).detach( 'span' ).appendTo( product_cat.find( 'th' ) );
-			})( jQuery );
-		");
+			})( jQuery );"
+		);
 	}
 }
 
-new WC_Admin_Taxonomies();
+$wc_admin_taxonomies = WC_Admin_Taxonomies::get_instance();

@@ -43,7 +43,6 @@ class WC_Plugins_Screen_Updates extends WC_Plugin_Updates {
 		$this->new_version            = $response->new_version;
 		$this->upgrade_notice         = $this->get_upgrade_notice( $response->new_version );
 		$this->major_untested_plugins = $this->get_untested_plugins( $response->new_version, 'major' );
-		$this->minor_untested_plugins = $this->get_untested_plugins( $response->new_version, 'minor' );
 
 		$current_version_parts = explode( '.', WC_VERSION );
 		$new_version_parts     = explode( '.', $this->new_version );
@@ -55,10 +54,6 @@ class WC_Plugins_Screen_Updates extends WC_Plugin_Updates {
 
 		if ( ! empty( $this->major_untested_plugins ) ) {
 			$this->upgrade_notice .= $this->get_extensions_inline_warning_major();
-		}
-
-		if ( ! empty( $this->minor_untested_plugins ) ) {
-			$this->upgrade_notice .= $this->get_extensions_inline_warning_minor();
 		}
 
 		if ( ! empty( $this->major_untested_plugins ) ) {
@@ -170,7 +165,7 @@ class WC_Plugins_Screen_Updates extends WC_Plugin_Updates {
 					$update_link.removeClass( 'wc-thickbox open-plugin-details-modal' );
 					$update_link.addClass( 'update-link' );
 					$update_link.attr( 'href', update_url );
-					$update_link.click();
+					$update_link.trigger( 'click' );
 				});
 
 				$( '#wc_untested_extensions_modal .cancel' ).on( 'click', function( evt ) {

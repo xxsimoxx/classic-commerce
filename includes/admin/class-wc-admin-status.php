@@ -17,20 +17,29 @@ class WC_Admin_Status {
 	 * Handles output of the reports page in admin.
 	 */
 	public static function output() {
-		include_once dirname( __FILE__ ) . '/views/html-admin-page-status.php';
+		include_once __DIR__ . '/views/html-admin-page-status.php';
 	}
 
 	/**
 	 * Handles output of report.
 	 */
 	public static function status_report() {
-		include_once dirname( __FILE__ ) . '/views/html-admin-page-status-report.php';
+		include_once __DIR__ . '/views/html-admin-page-status-report.php';
 	}
 
 	/**
 	 * Handles output of tools.
 	 */
 	public static function status_tools() {
+        // This screen requires classes from the REST API.
+		if ( ! did_action( 'rest_api_init' ) ) {
+			WC()->api->rest_api_includes();
+		}
+
+		if ( ! class_exists( 'WC_REST_System_Status_Tools_Controller', false ) ) {
+			wp_die( 'Cannot load the REST API to access WC_REST_System_Status_Tools_Controller.' );
+		}
+        
 		$tools = self::get_tools();
 
 		if ( ! empty( $_GET['action'] ) && ! empty( $_REQUEST['_wpnonce'] ) && wp_verify_nonce( wp_unslash( $_REQUEST['_wpnonce'] ), 'debug_action' ) ) { // WPCS: input var ok, sanitization ok.
@@ -40,12 +49,14 @@ class WC_Admin_Status {
 			if ( array_key_exists( $action, $tools ) ) {
 				$response = $tools_controller->execute_tool( $action );
 
-				$tool = $tools[ $action ];
+                $tool = $tools[ $action ];
+                $tool_requires_refresh = $tool['requires_refresh'] ?? false;
 				$tool = array(
 					'id'          => $action,
 					'name'        => $tool['name'],
 					'action'      => $tool['button'],
 					'description' => $tool['desc'],
+                    'disabled'    => $tool['disabled'] ?? false,
 				);
 				$tool = array_merge( $tool, $response );
 
@@ -74,7 +85,7 @@ class WC_Admin_Status {
 			echo '<div class="updated inline"><p>' . esc_html__( 'Your changes have been saved.', 'classic-commerce' ) . '</p></div>';
 		}
 
-		include_once dirname( __FILE__ ) . '/views/html-admin-page-status-tools.php';
+		include_once __DIR__ . '/views/html-admin-page-status-tools.php';
 	}
 
 	/**
@@ -116,7 +127,7 @@ class WC_Admin_Status {
 			self::remove_log();
 		}
 
-		include_once 'views/html-admin-page-status-logs.php';
+		include_once __DIR__ . '/views/html-admin-page-status-logs.php';
 	}
 
 	/**
@@ -134,7 +145,7 @@ class WC_Admin_Status {
 		$log_table_list = new WC_Admin_Log_Table_List();
 		$log_table_list->prepare_items();
 
-		include_once 'views/html-admin-page-status-logs-db.php';
+		include_once __DIR__ . '/views/html-admin-page-status-logs-db.php';
 	}
 
 	/**
@@ -225,7 +236,7 @@ class WC_Admin_Status {
 	 *
 	 * @param  object $theme WP_Theme object.
 	 * @return string Version number if found.
-	 */
+	**/ 
 	public static function get_latest_theme_version( $theme ) {
 		include_once ABSPATH . 'wp-admin/includes/theme.php';
 
@@ -241,7 +252,7 @@ class WC_Admin_Status {
 		);
 
 		$update_theme_version = 0;
-
+    
 		// Check .org for updates.
 		if ( is_object( $api ) && ! is_wp_error( $api ) ) {
 			$update_theme_version = $api->version;
@@ -277,7 +288,7 @@ class WC_Admin_Status {
 		}
 
 		return $update_theme_version;
-	}
+	} 
 
 	/**
 	 * Remove/delete the chosen file.
@@ -329,5 +340,28 @@ class WC_Admin_Status {
 			wp_safe_redirect( esc_url_raw( admin_url( 'admin.php?page=wc-status&tab=logs' ) ) );
 			exit();
 		}
+	}
+
+    /**
+	 * Prints table info if a base table is not present.
+	 */
+	private static function output_tables_info() {
+		$missing_tables = WC_Install::verify_base_tables( false );
+		if ( 0 === count( $missing_tables ) ) {
+			return;
+		}
+		?>
+
+		<br>
+		<strong style="color:#a00;">
+			<span class="dashicons dashicons-warning"></span>
+			<?php
+				esc_html_e( 'Missing base tables: ', 'classic-commerce' );
+				echo esc_html( implode( ', ', $missing_tables ) );
+				esc_html_e( '. Some Classic Commerce functionality may not work as expected.', 'classic-commerce' );
+			?>
+		</strong>
+
+		<?php
 	}
 }

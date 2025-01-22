@@ -49,13 +49,18 @@ class WC_Meta_Box_Product_Images {
 							$update_meta = true;
 							continue;
 						}
-
-						echo '<li class="image" data-attachment_id="' . esc_attr( $attachment_id ) . '">
-								' . $attachment . '
-								<ul class="actions">
-									<li><a href="#" class="delete tips" data-tip="' . esc_attr__( 'Delete image', 'classic-commerce' ) . '">' . __( 'Delete', 'classic-commerce' ) . '</a></li>
-								</ul>
-							</li>';
+                        ?>
+						<li class="image" data-attachment_id="<?php echo esc_attr( $attachment_id ); ?>">
+							<?php echo $attachment; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							<ul class="actions">
+								<li><a href="#" class="delete tips" data-tip="<?php esc_attr_e( 'Delete image', 'classic-commerce' ); ?>"><?php esc_html_e( 'Delete', 'classic-commerce' ); ?></a></li>
+							</ul>
+							<?php
+							// Allow for extra info to be exposed or extra action to be executed for this attachment.
+							do_action( 'woocommerce_admin_after_product_gallery_item', $thepostid, $attachment_id );
+							?>
+						</li>
+						<?php
 
 						// rebuild ids to be saved.
 						$updated_gallery_ids[] = $attachment_id;
@@ -73,7 +78,7 @@ class WC_Meta_Box_Product_Images {
 
 		</div>
 		<p class="add_product_images hide-if-no-js">
-			<a href="#" data-choose="<?php esc_attr_e( 'Add images to product gallery', 'classic-commerce' ); ?>" data-update="<?php esc_attr_e( 'Add to gallery', 'classic-commerce' ); ?>" data-delete="<?php esc_attr_e( 'Delete image', 'classic-commerce' ); ?>" data-text="<?php esc_attr_e( 'Delete', 'classic-commerce' ); ?>"><?php _e( 'Add product gallery images', 'classic-commerce' ); ?></a>
+			<a href="#" data-choose="<?php esc_attr_e( 'Add images to product gallery', 'classic-commerce' ); ?>" data-update="<?php esc_attr_e( 'Add to gallery', 'classic-commerce' ); ?>" data-delete="<?php esc_attr_e( 'Delete image', 'classic-commerce' ); ?>" data-text="<?php esc_attr_e( 'Delete', 'classic-commerce' ); ?>"><?php esc_html_e( 'Add product gallery images', 'classic-commerce' ); ?></a>
 		</p>
 		<?php
 	}

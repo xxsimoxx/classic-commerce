@@ -5,8 +5,8 @@
  * Legacy and deprecated functions are here to keep the WC_Legacy_Webhook class clean.
  * This class will be removed in future versions.
  *
- * @version  WC-3.2.0
- * @package  ClassicCommerce/Classes
+ * @version  3.2.0
+ * @package  ClassicCommerce\Classes
  * @category Class
  * @author   Automattic
  */
@@ -103,8 +103,8 @@ abstract class WC_Legacy_Webhook extends WC_Data {
 	/**
 	 * Get the post data for the webhook.
 	 *
-	 * @deprecated WC-3.2.0
-	 * @since      WC-2.2
+	 * @deprecated 3.2.0
+	 * @since      2.2
 	 * @return     null|WP_Post
 	 */
 	public function get_post_data() {
@@ -116,8 +116,8 @@ abstract class WC_Legacy_Webhook extends WC_Data {
 	/**
 	 * Update the webhook status.
 	 *
-	 * @deprecated WC-3.2.0
-	 * @since      WC-2.2.0
+	 * @deprecated 3.2.0
+	 * @since      2.2.0
 	 * @param      string $status Status to set.
 	 */
 	public function update_status( $status ) {

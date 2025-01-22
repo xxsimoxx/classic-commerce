@@ -6,7 +6,7 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates/Emails
- * @version WC-3.3.0
+ * @version WC-9.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -14,11 +14,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Load colors.
-$bg              = get_option( 'woocommerce_email_background_color' );
-$body            = get_option( 'woocommerce_email_body_background_color' );
-$base            = get_option( 'woocommerce_email_base_color' );
-$base_text       = wc_light_or_dark( $base, '#202020', '#ffffff' );
-$text            = get_option( 'woocommerce_email_text_color' );
+$bg          = get_option( 'woocommerce_email_background_color' );
+$body        = get_option( 'woocommerce_email_body_background_color' );
+$base        = get_option( 'woocommerce_email_base_color' );
+$base_text   = wc_light_or_dark( $base, '#202020', '#ffffff' );
+$text        = get_option( 'woocommerce_email_text_color' );
+$footer_text = get_option( 'woocommerce_email_footer_text_color' );
 
 // Pick a contrasting color for links.
 $link = wc_hex_is_light( $base ) ? $base : $base_text;
@@ -31,15 +32,26 @@ $body_darker_10  = wc_hex_darker( $body, 10 );
 $base_lighter_20 = wc_hex_lighter( $base, 20 );
 $base_lighter_40 = wc_hex_lighter( $base, 40 );
 $text_lighter_20 = wc_hex_lighter( $text, 20 );
+$text_lighter_40 = wc_hex_lighter( $text, 40 );
 
 // !important; is a gmail hack to prevent styles being stripped if it doesn't like something.
+// body{padding: 0;} ensures proper scale/positioning of the email in the iOS native email app.
 ?>
-#wrapper {
+body {
+    background-color: <?php echo esc_attr( $bg ); ?>;
+	padding: 0;
+    text-align: center
+}
+#outer_wrapper {
 	background-color: <?php echo esc_attr( $bg ); ?>;
-	margin: 0;
+}
+
+#wrapper {
+	margin: 0 auto;
 	padding: 70px 0 70px 0;
 	-webkit-text-size-adjust: none !important;
-	width: 100%;
+	width: 600px;
+    max-width: 100%
 }
 
 #template_container {
@@ -63,6 +75,12 @@ $text_lighter_20 = wc_hex_lighter( $text, 20 );
 #template_header h1,
 #template_header h1 a {
 	color: <?php echo esc_attr( $base_text ); ?>;
+    background-color: inherit;
+}
+
+#template_header_image img {
+	margin-left: 0;
+	margin-right: 0;
 }
 
 #template_footer td {
@@ -72,12 +90,16 @@ $text_lighter_20 = wc_hex_lighter( $text, 20 );
 
 #template_footer #credit {
 	border:0;
-	color: <?php echo esc_attr( $base_lighter_40 ); ?>;
+	color: <?php echo esc_attr( $footer_text ); ?>;
 	font-family: Arial;
-	font-size:12px;
-	line-height:125%;
-	text-align:center;
-	padding: 0 48px 48px 48px;
+	font-size: 12px;
+	line-height: 150%;
+	text-align: center;
+	padding: 24px 0;
+}
+
+#template_footer #credit p {
+	margin: 0 0 16px;
 }
 
 #body_content {
@@ -85,7 +107,7 @@ $text_lighter_20 = wc_hex_lighter( $text, 20 );
 }
 
 #body_content table td {
-	padding: 48px 48px 0;
+	padding: 48px 48px 32px;
 }
 
 #body_content table td td {
@@ -142,12 +164,17 @@ $text_lighter_20 = wc_hex_lighter( $text, 20 );
 }
 
 .link {
-	color: <?php echo esc_attr( $base ); ?>;
+	color: <?php echo esc_attr( $link ); ?>;
 }
 
 #header_wrapper {
 	padding: 36px 48px;
 	display: block;
+}
+
+#template_footer #credit,
+#template_footer #credit a {
+	color: <?php echo esc_attr( $footer_text ); ?>;
 }
 
 h1 {
@@ -190,15 +217,35 @@ a {
 }
 
 img {
+    max-width: 100%;
+	height: auto;
 	border: none;
 	display: inline-block;
 	font-size: 14px;
 	font-weight: bold;
-	height: auto;
 	outline: none;
 	text-decoration: none;
 	text-transform: capitalize;
 	vertical-align: middle;
 	margin-<?php echo is_rtl() ? 'left' : 'right'; ?>: 10px;
+}
+
+/**
+ * Media queries are not supported by all email clients, however they do work on modern mobile
+ * Gmail clients and can help us achieve better consistency there.
+ */
+@media screen and (max-width: 600px) {
+	#header_wrapper {
+		padding: 27px 36px !important;
+		font-size: 24px;
+	}
+
+	#body_content table > tbody > tr > td {
+		padding: 10px !important;
+	}
+
+	#body_content_inner {
+		font-size: 10px !important;
+	}
 }
 <?php

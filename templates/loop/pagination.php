@@ -6,7 +6,7 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates
- * @version WC-3.3.1
+ * @version WC-9.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -22,7 +22,7 @@ if ( $total <= 1 ) {
 	return;
 }
 ?>
-<nav class="woocommerce-pagination">
+<nav class="woocommerce-pagination" aria-label="<?php esc_attr_e( 'Product Pagination', 'classic-commerce' ); ?>">
 	<?php
 		echo paginate_links( apply_filters( 'woocommerce_pagination_args', array( // WPCS: XSS ok.
 			'base'         => $base,
@@ -30,8 +30,8 @@ if ( $total <= 1 ) {
 			'add_args'     => false,
 			'current'      => max( 1, $current ),
 			'total'        => $total,
-			'prev_text'    => '&larr;',
-			'next_text'    => '&rarr;',
+            'prev_text' => is_rtl() ? '&rarr;' : '&larr;',
+            'next_text' => is_rtl() ? '&larr;' : '&rarr;',
 			'type'         => 'list',
 			'end_size'     => 3,
 			'mid_size'     => 3,

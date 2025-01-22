@@ -253,6 +253,9 @@ class WC_Admin_Setup_Wizard {
 	 * Setup Wizard Header.
 	 */
 	public function setup_wizard_header() {
+        // same as default WP from wp-admin/admin-header.php.
+		$wp_version_class = 'branch-' . str_replace( array( '.', ',' ), '-', floatval( get_bloginfo( 'version' ) ) );
+
 		set_current_screen();
 		?>
 		<!DOCTYPE html>
@@ -266,8 +269,8 @@ class WC_Admin_Setup_Wizard {
 			<?php do_action( 'admin_print_styles' ); ?>
 			<?php do_action( 'admin_head' ); ?>
 		</head>
-		<body class="wc-setup wp-core-ui">
-			<h1 id="wc-logo"><a href="https://github.com/ClassicPress-plugins/classic-commerce/"><img src="<?php echo esc_url( WC()->plugin_url() ); ?>/assets/images/classic-commerce-logo.png" alt="Classic Commerce" /></a></h1>
+		<body class="wc-setup wp-core-ui  <?php echo esc_attr( $wp_version_class ); ?>">
+			<h1 id="wc-logo"><a href="https://github.com/ClassicPress-plugins/classic-commerce/"><img src="<?php echo esc_url( WC()->plugin_url() ); ?>/assets/images/classic-commerce-logo.png" alt="<?php esc_attr_e( 'Classic Commerce', 'classic-commerce' ); ?>" /></a></h1>
 		<?php
 	}
 
@@ -341,7 +344,7 @@ class WC_Admin_Setup_Wizard {
 		$state          = WC()->countries->get_base_state();
 		$country        = WC()->countries->get_base_country();
 		$postcode       = WC()->countries->get_base_postcode();
-		$currency       = get_option( 'woocommerce_currency', 'GBP' );
+		$currency       = get_option( 'woocommerce_currency', 'USD' );
 		$product_type   = get_option( 'woocommerce_product_type', 'both' );
 		$sell_in_person = get_option( 'woocommerce_sell_in_person', 'none_selected' );
 
@@ -361,7 +364,7 @@ class WC_Admin_Setup_Wizard {
 			<div class="store-address-container">
 
 				<label for="store_country" class="location-prompt"><?php esc_html_e( 'Where is your store based?', 'classic-commerce' ); ?></label>
-				<select id="store_country" name="store_country" required data-placeholder="<?php esc_attr_e( 'Choose a country&hellip;', 'classic-commerce' ); ?>" aria-label="<?php esc_attr_e( 'Country', 'classic-commerce' ); ?>" class="location-input wc-enhanced-select dropdown">
+				<select id="store_country" name="store_country" required data-placeholder="<?php esc_attr_e( 'Choose a country / region&hellip;', 'classic-commerce' ); ?>" aria-label="<?php esc_attr_e( 'Country / Region', 'classic-commerce' ); ?>" class="location-input wc-enhanced-select dropdown">
 					<?php foreach ( WC()->countries->get_countries() as $code => $label ) : ?>
 						<option <?php selected( $code, $country ); ?> value="<?php echo esc_attr( $code ); ?>"><?php echo esc_html( $label ); ?></option>
 					<?php endforeach; ?>
@@ -542,7 +545,7 @@ class WC_Admin_Setup_Wizard {
 	public function run_deferred_actions() {
 		$this->close_http_connection();
 		foreach ( $this->deferred_actions as $action ) {
-			call_user_func_array( $action['func'], $action['args'] );
+			$action['func']( ...$action['args'] );
 
 			// Clear the background installation flag if this is a plugin.
 			if (
@@ -899,12 +902,18 @@ class WC_Admin_Setup_Wizard {
 
 			// Save chosen shipping method settings (using REST controller for convenience).
 			if ( isset( $instance_id ) && ! empty( $_POST['shipping_zones']['domestic'][ $domestic_method ] ) ) { // WPCS: input var ok.
+
+            // Sanitize the cost field.
+				$domestic_cost = wc_clean( wp_unslash( $_POST['shipping_zones']['domestic'][ $domestic_method ] ) );
+				$domestic_cost = str_replace( array( get_woocommerce_currency_symbol(), html_entity_decode( get_woocommerce_currency_symbol() ) ), '', $domestic_cost );
+
+                // Build and make a REST request to save the shipping zone and method set.
 				$method_controller = new WC_REST_Shipping_Zone_Methods_Controller();
 				// @codingStandardsIgnoreStart
 				$method_controller->update_item( array(
 					'zone_id'     => $zone->get_id(),
 					'instance_id' => $instance_id,
-					'settings'    => wp_unslash( $_POST['shipping_zones']['domestic'][ $domestic_method ] ),
+					'settings'    => $domestic_cost,
 				) );
 				// @codingStandardsIgnoreEnd
 			}
@@ -919,12 +928,18 @@ class WC_Admin_Setup_Wizard {
 
 			// Save chosen shipping method settings (using REST controller for convenience).
 			if ( isset( $instance_id ) && ! empty( $_POST['shipping_zones']['intl'][ $intl_method ] ) ) { // WPCS: input var ok.
+
+            // Sanitize the cost field.
+				$intl_cost = wc_clean( wp_unslash( $_POST['shipping_zones']['intl'][ $intl_method ] ) );
+				$intl_cost = str_replace( array( get_woocommerce_currency_symbol(), html_entity_decode( get_woocommerce_currency_symbol() ) ), '', $intl_cost );
+
+                // Build and make a REST request to save the shipping zone and method set.
 				$method_controller = new WC_REST_Shipping_Zone_Methods_Controller();
 				// @codingStandardsIgnoreStart
 				$method_controller->update_item( array(
 					'zone_id'     => $zone->get_id(),
 					'instance_id' => $instance_id,
-					'settings'    => wp_unslash( $_POST['shipping_zones']['intl'][ $intl_method ] ),
+					'settings'    => $intl_cost,
 				) );
 				// @codingStandardsIgnoreEnd
 			}
@@ -1009,6 +1024,18 @@ class WC_Admin_Setup_Wizard {
 					<p><?php echo esc_html( $item_info['name'] ); ?></p>
 				<?php endif; ?>
 			</div>
+            <div class="wc-wizard-service-enable">
+				<span class="wc-wizard-service-toggle <?php echo esc_attr( $should_enable_toggle ? '' : 'disabled' ); ?>" tabindex="0">
+					<input
+						id="wc-wizard-service-<?php echo esc_attr( $item_id ); ?>"
+						type="checkbox"
+						name="wc-wizard-service-<?php echo esc_attr( $item_id ); ?>-enabled"
+						value="yes" <?php checked( $should_enable_toggle ); ?>
+						data-plugins="<?php echo wc_esc_json( wp_json_encode( $plugins ) ); ?>"
+					/>
+					<label for="wc-wizard-service-<?php echo esc_attr( $item_id ); ?>">
+				</span>
+			</div>
 			<div class="wc-wizard-service-description">
 				<?php echo wp_kses_post( wpautop( $item_info['description'] ) ); ?>
 				<?php if ( ! empty( $item_info['settings'] ) ) : ?>
@@ -1058,18 +1085,6 @@ class WC_Admin_Setup_Wizard {
 					</div>
 				<?php endif; ?>
 			</div>
-			<div class="wc-wizard-service-enable">
-				<span class="wc-wizard-service-toggle <?php echo esc_attr( $should_enable_toggle ? '' : 'disabled' ); ?>">
-					<input
-						id="wc-wizard-service-<?php echo esc_attr( $item_id ); ?>"
-						type="checkbox"
-						name="wc-wizard-service-<?php echo esc_attr( $item_id ); ?>-enabled"
-						value="yes" <?php checked( $should_enable_toggle ); ?>
-						data-plugins="<?php echo wc_esc_json( wp_json_encode( $plugins ) ); ?>"
-					/>
-					<label for="wc-wizard-service-<?php echo esc_attr( $item_id ); ?>">
-				</span>
-			</div>
 		</li>
 		<?php
 	}
@@ -1108,7 +1123,7 @@ class WC_Admin_Setup_Wizard {
 					<div class="wc-wizard-service-description">
 						<?php esc_html_e( 'Collect payments from customers offline.', 'classic-commerce' ); ?>
 					</div>
-					<div class="wc-wizard-service-enable">
+					<div class="wc-wizard-service-enable" tabindex="0">
 						<input class="wc-wizard-service-list-toggle" id="wc-wizard-service-list-toggle" type="checkbox">
 						<label for="wc-wizard-service-list-toggle"></label>
 					</div>

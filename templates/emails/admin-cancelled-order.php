@@ -6,7 +6,7 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates/Emails
- * @version WC-3.5.0
+ * @version WC-3.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 do_action( 'woocommerce_email_header', $email_heading, $email ); ?>
 
 <?php /* translators: %1$s: Customer full name. %2$s: Order numer */ ?>
-<p><?php printf( esc_html__( 'Alas. Just to let you know &mdash; %1$s has cancelled order #%2$s:', 'classic-commerce' ), esc_html( $order->get_formatted_billing_full_name() ), esc_html( $order->get_order_number() ) ); ?></p>
+<p><?php printf( esc_html__( 'Notification to let you know &mdash; %1$s has cancelled order #%2$s:', 'classic-commerce' ), esc_html( $order->get_formatted_billing_full_name() ), esc_html( $order->get_order_number() ) ); ?></p>
 
 <?php
 
@@ -41,11 +41,13 @@ do_action( 'woocommerce_email_order_meta', $order, $sent_to_admin, $plain_text, 
  * @hooked WC_Emails::email_address() Shows email address
  */
 do_action( 'woocommerce_email_customer_details', $order, $sent_to_admin, $plain_text, $email );
-?>
-<p>
-<?php esc_html_e( 'Thanks for reading.', 'classic-commerce' ); ?>
-</p>
-<?php
+
+/**
+ * Show user-defined additonal content - this is set in each email's settings.
+ */
+if ( $additional_content ) {
+	echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) );
+}
 
 /*
  * @hooked WC_Emails::email_footer() Output the email footer

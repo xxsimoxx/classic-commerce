@@ -21,7 +21,8 @@ function wc_page_endpoint_title( $title ) {
 
 	if ( ! is_null( $wp_query ) && ! is_admin() && is_main_query() && in_the_loop() && is_page() && is_wc_endpoint_url() ) {
 		$endpoint       = WC()->query->get_current_endpoint();
-		$endpoint_title = WC()->query->get_endpoint_title( $endpoint );
+		$action         = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
+		$endpoint_title = WC()->query->get_endpoint_title( $endpoint, $action );
 		$title          = $endpoint_title ? $endpoint_title : $title;
 
 		remove_filter( 'the_title', 'wc_page_endpoint_title' );
@@ -31,6 +32,36 @@ function wc_page_endpoint_title( $title ) {
 }
 
 add_filter( 'the_title', 'wc_page_endpoint_title' );
+
+/**
+ * Replace the title part of the document title.
+ *
+ * @param array $title {
+ *     The document title parts.
+ *
+ *     @type string $title   Title of the viewed page.
+ *     @type string $page    Optional. Page number if paginated.
+ *     @type string $tagline Optional. Site description when on home page.
+ *     @type string $site    Optional. Site title when not on home page.
+ * }
+ * @return array
+ */
+function wc_page_endpoint_document_title_parts( $title ) {
+	global $wp_query;
+
+	if ( ! is_null( $wp_query ) && ! is_admin() && is_main_query() && is_page() && is_wc_endpoint_url() ) {
+		$endpoint       = WC()->query->get_current_endpoint();
+		$action         = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$endpoint_title = WC()->query->get_endpoint_title( $endpoint, $action );
+		$title['title'] = $endpoint_title ? $endpoint_title : $title['title'];
+
+		remove_filter( 'document_title_parts', 'wc_page_endpoint_document_title_parts' );
+	}
+
+	return $title;
+}
+
+add_filter( 'document_title_parts', 'wc_page_endpoint_document_title_parts' );
 
 /**
  * Retrieve page ids - used for myaccount, edit_address, shop, cart, checkout, pay, view_order, terms. returns -1 if no page is found.
@@ -101,10 +132,12 @@ function wc_get_endpoint_url( $endpoint, $value = '', $permalink = '' ) {
 		} else {
 			$query_string = '';
 		}
-		$url = trailingslashit( $permalink ) . trailingslashit( $endpoint );
+		$url = trailingslashit( $permalink );
 
 		if ( $value ) {
-			$url .= trailingslashit( $value );
+			$url .= trailingslashit( $endpoint ) . user_trailingslashit( $value );
+		} else {
+			$url .= user_trailingslashit( $endpoint );
 		}
 
 		$url .= $query_string;
@@ -130,8 +163,8 @@ function wc_nav_menu_items( $items ) {
 				if ( empty( $item->url ) ) {
 					continue;
 				}
-				$path  = wp_parse_url( $item->url, PHP_URL_PATH );
-				$query = wp_parse_url( $item->url, PHP_URL_QUERY );
+				$path  = wp_parse_url( $item->url, PHP_URL_PATH ) ?? '';
+				$query = wp_parse_url( $item->url, PHP_URL_QUERY ) ?? '';
 
 				if ( strstr( $path, $customer_logout ) || strstr( $query, $customer_logout ) ) {
 					unset( $items[ $key ] );
@@ -165,7 +198,7 @@ function wc_nav_menu_item_classes( $menu_items ) {
 			$menu_id = (int) $menu_item->object_id;
 
 			// Unset active class for blog page.
-			if ( $page_for_posts === $menu_id ) {
+			if ( $page_for_posts === $menu_id && isset( $menu_item->object ) && 'page' === $menu_item->object ) {
 				$menu_items[ $key ]->current = false;
 
 				if ( in_array( 'current_page_parent', $classes, true ) ) {

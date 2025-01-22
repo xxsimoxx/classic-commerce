@@ -2,8 +2,8 @@
 /**
  * Handles responses from PayPal IPN.
  *
- * @package ClassicCommerce/PayPal
- * @version WC-3.3.0
+ * @package ClassicCommerce\PayPal
+ * @version 3.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -92,7 +92,7 @@ class WC_Gateway_Paypal_IPN_Handler extends WC_Gateway_Paypal_Response {
 			'httpversion' => '1.1',
 			'compress'    => false,
 			'decompress'  => false,
-			'user-agent'  => WooCommerce::user_agent_header(),
+			'user-agent'  => 'WooCommerce/' . WC()->version,
 		);
 
 		// Post back to get a response.
@@ -163,7 +163,7 @@ class WC_Gateway_Paypal_IPN_Handler extends WC_Gateway_Paypal_Response {
 
 	/**
 	 * Check receiver email from PayPal. If the receiver email in the IPN is different than what is stored in.
-	 * Classic Commerce -> Settings -> Checkout -> PayPal, it will log an error about it.
+	 * WooCommerce -> Settings -> Checkout -> PayPal, it will log an error about it.
 	 *
 	 * @param WC_Order $order          Order object.
 	 * @param string   $receiver_email Email to validate.
@@ -201,12 +201,11 @@ class WC_Gateway_Paypal_IPN_Handler extends WC_Gateway_Paypal_Response {
 				$this->payment_status_paid_cancelled_order( $order, $posted );
 			}
 
-			$this->payment_complete( $order, ( ! empty( $posted['txn_id'] ) ? wc_clean( $posted['txn_id'] ) : '' ), __( 'IPN payment completed', 'classic-commerce' ) );
-
 			if ( ! empty( $posted['mc_fee'] ) ) {
-				// Log paypal transaction fee.
-				update_post_meta( $order->get_id(), 'PayPal Transaction Fee', wc_clean( $posted['mc_fee'] ) );
+				$order->add_meta_data( 'PayPal Transaction Fee', wc_clean( $posted['mc_fee'] ) );
 			}
+
+			$this->payment_complete( $order, ( ! empty( $posted['txn_id'] ) ? wc_clean( $posted['txn_id'] ) : '' ), __( 'IPN payment completed', 'classic-commerce' ) );
 		} else {
 			if ( 'authorization' === $posted['pending_reason'] ) {
 				$this->payment_on_hold( $order, __( 'Payment authorized. Change payment status to processing or complete to capture funds.', 'classic-commerce' ) );
@@ -346,14 +345,15 @@ class WC_Gateway_Paypal_IPN_Handler extends WC_Gateway_Paypal_Response {
 	 */
 	protected function save_paypal_meta_data( $order, $posted ) {
 		if ( ! empty( $posted['payment_type'] ) ) {
-			update_post_meta( $order->get_id(), 'Payment type', wc_clean( $posted['payment_type'] ) );
+			$order->update_meta_data( 'Payment type', wc_clean( $posted['payment_type'] ) );
 		}
 		if ( ! empty( $posted['txn_id'] ) ) {
-			update_post_meta( $order->get_id(), '_transaction_id', wc_clean( $posted['txn_id'] ) );
+			$order->set_transaction_id( wc_clean( $posted['txn_id'] ) );
 		}
 		if ( ! empty( $posted['payment_status'] ) ) {
-			update_post_meta( $order->get_id(), '_paypal_status', wc_clean( $posted['payment_status'] ) );
+			$order->update_meta_data( '_paypal_status', wc_clean( $posted['payment_status'] ) );
 		}
+		$order->save();
 	}
 
 	/**

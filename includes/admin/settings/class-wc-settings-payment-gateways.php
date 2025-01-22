@@ -2,7 +2,7 @@
 /**
  * Classic Commerce Checkout Settings
  *
- * @package ClassicCommerce/Admin
+ * @package ClassicCommerce\Admin
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -28,53 +28,47 @@ class WC_Settings_Payment_Gateways extends WC_Settings_Page {
 	}
 
 	/**
-	 * Get sections.
+	 * Get own sections.
 	 *
 	 * @return array
 	 */
-	public function get_sections() {
-		$sections = array(
+	protected function get_own_sections() {
+		return array(
 			'' => __( 'Payment methods', 'classic-commerce' ),
 		);
-		return apply_filters( 'woocommerce_get_sections_' . $this->id, $sections );
 	}
 
 	/**
 	 * Get settings array.
 	 *
-	 * @param string $current_section Section being shown.
 	 * @return array
 	 */
-	public function get_settings( $current_section = '' ) {
-		$settings = array();
-
-		if ( '' === $current_section ) {
-			$settings = apply_filters(
-				'woocommerce_payment_gateways_settings', array(
-					array(
-						'title' => __( 'Payment methods', 'classic-commerce' ),
-						'desc'  => __( 'Installed payment methods are listed below and can be sorted to control their display order on the frontend.', 'classic-commerce' ),
-						'type'  => 'title',
-						'id'    => 'payment_gateways_options',
-					),
-					array(
-						'type' => 'payment_gateways',
-					),
-					array(
-						'type' => 'sectionend',
-						'id'   => 'payment_gateways_options',
-					),
-				)
+	protected function get_settings_for_default_section() {
+		$settings =
+			array(
+				array(
+					'title' => __( 'Payment methods', 'classic-commerce' ),
+					'desc'  => __( 'Installed payment methods are listed below and can be sorted to control their display order on the frontend.', 'classic-commerce' ),
+					'type'  => 'title',
+					'id'    => 'payment_gateways_options',
+				),
+				array(
+					'type' => 'payment_gateways',
+				),
+				array(
+					'type' => 'sectionend',
+					'id'   => 'payment_gateways_options',
+				),
 			);
-		}
 
-		return apply_filters( 'woocommerce_get_settings_' . $this->id, $settings, $current_section );
+		return apply_filters( 'woocommerce_payment_gateways_settings', $settings );
 	}
 
 	/**
 	 * Output the settings.
 	 */
 	public function output() {
+		//phpcs:disable WordPress.Security.NonceVerification.Recommended
 		global $current_section;
 
 		// Load gateways so we can show any global options they may have.
@@ -83,20 +77,31 @@ class WC_Settings_Payment_Gateways extends WC_Settings_Page {
 		if ( $current_section ) {
 			foreach ( $payment_gateways as $gateway ) {
 				if ( in_array( $current_section, array( $gateway->id, sanitize_title( get_class( $gateway ) ) ), true ) ) {
-					if ( isset( $_GET['toggle_enabled'] ) ) { // WPCS: input var ok, CSRF ok.
+					if ( isset( $_GET['toggle_enabled'] ) ) {
 						$enabled = $gateway->get_option( 'enabled' );
 
 						if ( $enabled ) {
 							$gateway->settings['enabled'] = wc_string_to_bool( $enabled ) ? 'no' : 'yes';
 						}
 					}
-					$gateway->admin_options();
+					$this->run_gateway_admin_options( $gateway );
 					break;
 				}
 			}
 		}
-		$settings = $this->get_settings( $current_section );
-		WC_Admin_Settings::output_fields( $settings );
+
+		parent::output();
+		//phpcs:enable
+	}
+
+	/**
+	 * Run the 'admin_options' method on a given gateway.
+	 * This method exists to easy unit testing.
+	 *
+	 * @param object $gateway The gateway object to run the method on.
+	 */
+	protected function run_gateway_admin_options( $gateway ) {
+		$gateway->admin_options();
 	}
 
 	/**
@@ -211,10 +216,15 @@ class WC_Settings_Payment_Gateways extends WC_Settings_Page {
 		global $current_section;
 
 		$wc_payment_gateways = WC_Payment_Gateways::instance();
-		$wc_payment_gateways->process_admin_options();
-		$wc_payment_gateways->init();
 
-		if ( $current_section ) {
+		$this->save_settings_for_current_section();
+
+		if ( ! $current_section ) {
+			// If section is empty, we're on the main settings page. This makes sure 'gateway ordering' is saved.
+			$wc_payment_gateways->process_admin_options();
+			$wc_payment_gateways->init();
+		} else {
+			// There is a section - this may be a gateway or custom section.
 			foreach ( $wc_payment_gateways->payment_gateways() as $gateway ) {
 				if ( in_array( $current_section, array( $gateway->id, sanitize_title( get_class( $gateway ) ) ), true ) ) {
 					do_action( 'woocommerce_update_options_payment_gateways_' . $gateway->id );
@@ -222,10 +232,8 @@ class WC_Settings_Payment_Gateways extends WC_Settings_Page {
 				}
 			}
 
-			do_action( 'woocommerce_update_options_' . $this->id . '_' . $current_section );
+			$this->do_update_options_action();
 		}
-
-		WC_Admin_Settings::save_fields( $this->get_settings( $current_section ) );
 	}
 }
 

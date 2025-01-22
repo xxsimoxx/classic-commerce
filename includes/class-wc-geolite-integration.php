@@ -8,6 +8,7 @@
  *
  * @package ClassicCommerce\Classes
  * @since   WC-3.4.0
+ * @deprecated 3.9.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -38,10 +39,6 @@ class WC_Geolite_Integration {
 	 */
 	public function __construct( $database ) {
 		$this->database = $database;
-
-		if ( ! class_exists( 'MaxMind\\Db\\Reader', false ) ) {
-			$this->require_geolite_library();
-		}
 	}
 
 	/**
@@ -50,8 +47,11 @@ class WC_Geolite_Integration {
 	 *
 	 * @param string $ip_address User IP address.
 	 * @return string
+     * @deprecated 3.9.0
 	 */
 	public function get_country_iso( $ip_address ) {
+        wc_deprecated_function( 'get_country_iso', '3.9.0' );
+
 		$iso_code = '';
 
 		try {
@@ -86,16 +86,5 @@ class WC_Geolite_Integration {
 		}
 
 		$this->log->log( $level, $message, array( 'source' => 'geoip' ) );
-	}
-
-	/**
-	 * Require geolite library.
-	 */
-	private function require_geolite_library() {
-		require_once WC_ABSPATH . 'includes/libraries/geolite2/Reader/Decoder.php';
-		require_once WC_ABSPATH . 'includes/libraries/geolite2/Reader/InvalidDatabaseException.php';
-		require_once WC_ABSPATH . 'includes/libraries/geolite2/Reader/Metadata.php';
-		require_once WC_ABSPATH . 'includes/libraries/geolite2/Reader/Util.php';
-		require_once WC_ABSPATH . 'includes/libraries/geolite2/Reader.php';
 	}
 }

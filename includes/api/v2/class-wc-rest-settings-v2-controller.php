@@ -4,8 +4,8 @@
  *
  * Handles requests to the /settings endpoints.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Settings controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Controller
  */
 class WC_REST_Settings_V2_Controller extends WC_REST_Controller {
@@ -35,7 +35,7 @@ class WC_REST_Settings_V2_Controller extends WC_REST_Controller {
 	/**
 	 * Register routes.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 */
 	public function register_routes() {
 		register_rest_route(
@@ -53,7 +53,7 @@ class WC_REST_Settings_V2_Controller extends WC_REST_Controller {
 	/**
 	 * Get all settings groups items.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WP_REST_Request $request Request data.
 	 * @return WP_Error|WP_REST_Response
 	 */
@@ -108,7 +108,7 @@ class WC_REST_Settings_V2_Controller extends WC_REST_Controller {
 	/**
 	 * Prepare a report sales object for serialization.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param array           $item Group object.
 	 * @param WP_REST_Request $request Request object.
 	 * @return WP_REST_Response $response Response data.
@@ -129,7 +129,7 @@ class WC_REST_Settings_V2_Controller extends WC_REST_Controller {
 	 * Filters out bad values from the groups array/filter so we
 	 * only return known values via the API.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @param  array $group Group.
 	 * @return array
 	 */
@@ -143,7 +143,7 @@ class WC_REST_Settings_V2_Controller extends WC_REST_Controller {
 	/**
 	 * Callback for allowed keys for each group response.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  string $key Key to check.
 	 * @return boolean
 	 */
@@ -154,7 +154,7 @@ class WC_REST_Settings_V2_Controller extends WC_REST_Controller {
 	/**
 	 * Returns default settings for groups. null means the field is required.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @return array
 	 */
 	protected function group_defaults() {
@@ -170,7 +170,7 @@ class WC_REST_Settings_V2_Controller extends WC_REST_Controller {
 	/**
 	 * Makes sure the current user has access to READ the settings APIs.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param WP_REST_Request $request Full data about the request.
 	 * @return WP_Error|boolean
 	 */
@@ -185,7 +185,7 @@ class WC_REST_Settings_V2_Controller extends WC_REST_Controller {
 	/**
 	 * Get the groups schema, conforming to JSON Schema.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @return array
 	 */
 	public function get_item_schema() {

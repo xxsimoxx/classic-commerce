@@ -2,8 +2,8 @@
 /**
  * Classic Commerce Email Settings
  *
- * @package ClassicCommerce/Admin
- * @version WC-2.1.0
+ * @package ClassicCommerce\Admin
+ * @version 2.1.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -29,15 +29,14 @@ class WC_Settings_Emails extends WC_Settings_Page {
 	}
 
 	/**
-	 * Get sections.
+	 * Get own sections.
 	 *
 	 * @return array
 	 */
-	public function get_sections() {
-		$sections = array(
+	protected function get_own_sections() {
+		return array(
 			'' => __( 'Email options', 'classic-commerce' ),
 		);
-		return apply_filters( 'woocommerce_get_sections_' . $this->id, $sections );
 	}
 
 	/**
@@ -45,13 +44,19 @@ class WC_Settings_Emails extends WC_Settings_Page {
 	 *
 	 * @return array
 	 */
-	public function get_settings() {
-		$settings = apply_filters(
-			'woocommerce_email_settings', array(
-
+	protected function get_settings_for_default_section() {
+		$desc_help_text = sprintf(
+		/* translators: %1$s: Link to WP Mail Logging plugin, %2$s: Link to Email FAQ support page. */
+			__( 'To ensure your store&rsquo;s notifications arrive in your and your customers&rsquo; inboxes, we recommend connecting your email address to your domain and setting up a dedicated SMTP server. If something doesn&rsquo;t seem to be sending correctly, install the <a href="%1$s">WP Mail Logging Plugin</a> or check the <a href="%2$s">Email Settings page</a>.', 'classic-commerce' ),
+			'https://wordpress.org/plugins/wp-mail-logging/',
+			'https://classiccommerce.cc/docs/installation-and-setup/email-settings/'
+		);
+		$settings =
+			array(
 				array(
 					'title' => __( 'Email notifications', 'classic-commerce' ),
-					'desc'  => __( 'Email notifications sent from Classic Commerce are listed below. Click on an email to configure it.', 'classic-commerce' ),
+					/* translators: %s: help description with link to WP Mail logging and support page. */
+					'desc'  => sprintf( __( 'Email notifications sent from Classic Commerce are listed below. Click on an email to configure it.<br>%s', 'classic-commerce' ), $desc_help_text ),
 					'type'  => 'title',
 					'id'    => 'email_notification_settings',
 				),
@@ -80,7 +85,7 @@ class WC_Settings_Emails extends WC_Settings_Page {
 					'desc'     => __( 'How the sender name appears in outgoing Classic Commerce emails.', 'classic-commerce' ),
 					'id'       => 'woocommerce_email_from_name',
 					'type'     => 'text',
-					'css'      => 'min-width:300px;',
+					'css'      => 'min-width:400px;',
 					'default'  => esc_attr( get_bloginfo( 'name', 'display' ) ),
 					'autoload' => false,
 					'desc_tip' => true,
@@ -94,7 +99,7 @@ class WC_Settings_Emails extends WC_Settings_Page {
 					'custom_attributes' => array(
 						'multiple' => 'multiple',
 					),
-					'css'               => 'min-width:300px;',
+					'css'               => 'min-width:400px;',
 					'default'           => get_option( 'admin_email' ),
 					'autoload'          => false,
 					'desc_tip'          => true,
@@ -118,22 +123,9 @@ class WC_Settings_Emails extends WC_Settings_Page {
 					'desc'        => __( 'URL to an image you want to show in the email header. Upload images using the media uploader (Admin > Media).', 'classic-commerce' ),
 					'id'          => 'woocommerce_email_header_image',
 					'type'        => 'text',
-					'css'         => 'min-width:300px;',
+					'css'         => 'min-width:400px;',
 					'placeholder' => __( 'N/A', 'classic-commerce' ),
 					'default'     => '',
-					'autoload'    => false,
-					'desc_tip'    => true,
-				),
-
-				array(
-					'title'       => __( 'Footer text', 'classic-commerce' ),
-					/* translators: %s: Available placeholders for use */
-					'desc'        => __( 'The text to appear in the footer of Classic Commerce emails.', 'classic-commerce' ) . ' ' . sprintf( __( 'Available placeholders: %s', 'classic-commerce' ), '{site_title}' ),
-					'id'          => 'woocommerce_email_footer_text',
-					'css'         => 'width:300px; height: 75px;',
-					'placeholder' => __( 'N/A', 'classic-commerce' ),
-					'type'        => 'textarea',
-					'default'     => '{site_title}<br/>Powered by <a href="https://github.com/ClassicPress-plugins/classic-commerce/">Classic Commerce</a>',
 					'autoload'    => false,
 					'desc_tip'    => true,
 				),
@@ -186,15 +178,38 @@ class WC_Settings_Emails extends WC_Settings_Page {
 					'desc_tip' => true,
 				),
 
+                array(
+					'title'       => __( 'Footer text', 'classic-commerce' ),
+					/* translators: %s: Available placeholders for use */
+					'desc'        => __( 'The text to appear in the footer of all Classic Commerce emails.', 'classic-commerce' ) . ' ' . sprintf( __( 'Available placeholders: %s', 'classic-commerce' ), '{site_title} {site_url}' ),
+					'id'          => 'woocommerce_email_footer_text',
+					'css'         => 'width:400px; height: 75px;',
+					'placeholder' => __( 'N/A', 'classic-commerce' ),
+					'type'        => 'textarea',
+					'default'     => '{site_title} &mdash; Built with {Classic Commerce}',
+					'autoload'    => false,
+					'desc_tip'    => true,
+				),
+
+				array(
+					'title'    => __( 'Footer text color', 'classic-commerce' ),
+					/* translators: %s: footer default color */
+					'desc'     => sprintf( __( 'The footer text color. Default %s.', 'classic-commerce' ), '<code>#3c3c3c</code>' ),
+					'id'       => 'woocommerce_email_footer_text_color',
+                    'type'     => 'color',
+					'css'      => 'width:6em;',
+					'default'  => '#3c3c3c',
+					'autoload' => false,
+					'desc_tip' => true,
+				),
+
 				array(
 					'type' => 'sectionend',
 					'id'   => 'email_template_options',
 				),
+			);
 
-			)
-		);
-
-		return apply_filters( 'woocommerce_get_settings_' . $this->id, $settings );
+		return apply_filters( 'woocommerce_email_settings', $settings );
 	}
 
 	/**
@@ -210,14 +225,23 @@ class WC_Settings_Emails extends WC_Settings_Page {
 		if ( $current_section ) {
 			foreach ( $email_templates as $email_key => $email ) {
 				if ( strtolower( $email_key ) === $current_section ) {
-					$email->admin_options();
+					$this->run_email_admin_options( $email );
 					break;
 				}
 			}
-		} else {
-			$settings = $this->get_settings();
-			WC_Admin_Settings::output_fields( $settings );
 		}
+
+		parent::output();
+	}
+
+	/**
+	 * Run the 'admin_options' method on a given email.
+	 * This method exists to easy unit testing.
+	 *
+	 * @param object $email The email object to run the method on.
+	 */
+	protected function run_email_admin_options( $email ) {
+		$email->admin_options();
 	}
 
 	/**
@@ -227,19 +251,20 @@ class WC_Settings_Emails extends WC_Settings_Page {
 		global $current_section;
 
 		if ( ! $current_section ) {
-			WC_Admin_Settings::save_fields( $this->get_settings() );
-
+			$this->save_settings_for_current_section();
+			$this->do_update_options_action();
 		} else {
 			$wc_emails = WC_Emails::instance();
 
 			if ( in_array( $current_section, array_map( 'sanitize_title', array_keys( $wc_emails->get_emails() ) ), true ) ) {
 				foreach ( $wc_emails->get_emails() as $email_id => $email ) {
 					if ( sanitize_title( $email_id ) === $current_section ) {
-						do_action( 'woocommerce_update_options_' . $this->id . '_' . $email->id );
+						$this->do_update_options_action( $email->id );
 					}
 				}
 			} else {
-				do_action( 'woocommerce_update_options_' . $this->id . '_' . $current_section );
+				$this->save_settings_for_current_section();
+				$this->do_update_options_action();
 			}
 		}
 	}
@@ -260,7 +285,8 @@ class WC_Settings_Emails extends WC_Settings_Page {
 					<tr>
 						<?php
 						$columns = apply_filters(
-							'woocommerce_email_setting_columns', array(
+							'woocommerce_email_setting_columns',
+							array(
 								'status'     => '',
 								'name'       => __( 'Email', 'classic-commerce' ),
 								'email_type' => __( 'Content type', 'classic-commerce' ),

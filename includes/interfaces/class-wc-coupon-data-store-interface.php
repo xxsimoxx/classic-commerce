@@ -6,10 +6,6 @@
  * @package ClassicCommerce/Interfaces
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * WC Coupon Data Store Interface
  *

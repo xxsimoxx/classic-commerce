@@ -4,8 +4,8 @@
  *
  * Handles requests to the /shipping/zones endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Shipping Zones class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Shipping_Zones_V2_Controller
  */
 class WC_REST_Shipping_Zones_Controller extends WC_REST_Shipping_Zones_V2_Controller {

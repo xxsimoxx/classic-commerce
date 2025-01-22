@@ -70,6 +70,13 @@ class WC_Product_CSV_Importer_Controller {
 	 */
 	protected $update_existing = false;
 
+    /**
+	 * The character encoding to use to interpret the input file, or empty string for autodetect.
+	 *
+	 * @var string
+	 */
+	protected $character_encoding = 'UTF-8';
+
 	/**
 	 * Get importer instance.
 	 *
@@ -86,23 +93,58 @@ class WC_Product_CSV_Importer_Controller {
 	/**
 	 * Check whether a file is a valid CSV file.
 	 *
-	 * @todo Replace this method with wc_is_file_valid_csv() function.
 	 * @param string $file File path.
 	 * @param bool   $check_path Whether to also check the file is located in a valid location (Default: true).
 	 * @return bool
 	 */
 	public static function is_file_valid_csv( $file, $check_path = true ) {
-		if ( $check_path && apply_filters( 'woocommerce_product_csv_importer_check_import_file_path', true ) && false !== stripos( $file, '://' ) ) {
-			return false;
-		}
+		return wc_is_file_valid_csv( $file, $check_path );
+	}
 
-		$valid_filetypes = self::get_valid_csv_filetypes();
-		$filetype = wp_check_filetype( $file, $valid_filetypes );
-		if ( in_array( $filetype['type'], $valid_filetypes, true ) ) {
-			return true;
+    /**
+	 * Runs before controller actions to check that the file used during the import is valid.
+	 *
+	 * @since 9.3.0
+	 *
+	 * @param string $path Path to test.
+	 *
+	 * @throws \Exception When file validation fails.
+	 */
+	protected static function check_file_path( string $path ): void {
+		$is_valid_file = false;
+		if ( ! empty( $path ) ) {
+			$path          = realpath( $path );
+			$is_valid_file = false !== $path;
 		}
+		// File must be readable.
+		$is_valid_file = $is_valid_file && is_readable( $path );
 
-		return false;
+		// Check that file is within an allowed location.
+		if ( $is_valid_file ) {
+			$normalized_path   = wp_normalize_path( $path );
+			$in_valid_location = false;
+			$valid_locations   = array();
+			$valid_locations[] = ABSPATH;
+			$upload_dir = wp_get_upload_dir();
+			if ( false === $upload_dir['error'] ) {
+				$valid_locations[] = $upload_dir['basedir'];
+			}
+
+			foreach ( $valid_locations as $valid_location ) {
+                $normalized_location = wp_normalize_path( realpath( $valid_location ) );
+				if ( 0 === stripos( $normalized_path, trailingslashit( $normalized_location ) ) ) {
+					$in_valid_location = true;
+					break;
+				}
+			}
+			$is_valid_file = $in_valid_location;
+		}
+		if ( ! $is_valid_file ) {
+			throw new \Exception( esc_html__( 'File path provided for import is invalid.', 'classic-commerce' ) );
+		}
+		if ( ! self::is_file_valid_csv( $path ) ) {
+			throw new \Exception( esc_html__( 'Invalid file type. The importer supports CSV and TXT file formats.', 'classic-commerce' ) );
+		}
 	}
 
 	/**
@@ -149,11 +191,12 @@ class WC_Product_CSV_Importer_Controller {
 		$this->steps = apply_filters( 'woocommerce_product_csv_importer_steps', $default_steps );
 
 		// phpcs:disable WordPress.CSRF.NonceVerification.NoNonceVerification
-		$this->step            = isset( $_REQUEST['step'] ) ? sanitize_key( $_REQUEST['step'] ) : current( array_keys( $this->steps ) );
-		$this->file            = isset( $_REQUEST['file'] ) ? wc_clean( wp_unslash( $_REQUEST['file'] ) ) : '';
-		$this->update_existing = isset( $_REQUEST['update_existing'] ) ? (bool) $_REQUEST['update_existing'] : false;
-		$this->delimiter       = ! empty( $_REQUEST['delimiter'] ) ? wc_clean( wp_unslash( $_REQUEST['delimiter'] ) ) : ',';
-		$this->map_preferences = isset( $_REQUEST['map_preferences'] ) ? (bool) $_REQUEST['map_preferences'] : false;
+		$this->step               = isset( $_REQUEST['step'] ) ? sanitize_key( $_REQUEST['step'] ) : current( array_keys( $this->steps ) );
+		$this->file               = isset( $_REQUEST['file'] ) ? wc_clean( wp_unslash( $_REQUEST['file'] ) ) : '';
+		$this->update_existing    = isset( $_REQUEST['update_existing'] ) ? (bool) $_REQUEST['update_existing'] : false;
+		$this->delimiter          = ! empty( $_REQUEST['delimiter'] ) ? wc_clean( wp_unslash( $_REQUEST['delimiter'] ) ) : ',';
+		$this->map_preferences    = isset( $_REQUEST['map_preferences'] ) ? (bool) $_REQUEST['map_preferences'] : false;
+		$this->character_encoding = isset( $_REQUEST['character_encoding'] ) ? wc_clean( wp_unslash( $_REQUEST['character_encoding'] ) ) : 'UTF-8';
 		// phpcs:enable
 
 		if ( $this->map_preferences ) {
@@ -187,12 +230,13 @@ class WC_Product_CSV_Importer_Controller {
 		}
 
 		$params = array(
-			'step'            => $keys[ $step_index + 1 ],
-			'file'            => str_replace( DIRECTORY_SEPARATOR, '/', $this->file ),
-			'delimiter'       => $this->delimiter,
-			'update_existing' => $this->update_existing,
-			'map_preferences' => $this->map_preferences,
-			'_wpnonce'        => wp_create_nonce( 'woocommerce-csv-importer' ), // wp_nonce_url() escapes & to &amp; breaking redirects.
+			'step'               => $keys[ $step_index + 1 ],
+			'file'               => str_replace( DIRECTORY_SEPARATOR, '/', $this->file ),
+			'delimiter'          => $this->delimiter,
+			'update_existing'    => $this->update_existing,
+			'map_preferences'    => $this->map_preferences,
+			'character_encoding' => $this->character_encoding,
+			'_wpnonce'           => wp_create_nonce( 'woocommerce-csv-importer' ), // wp_nonce_url() escapes & to &amp; breaking redirects.
 		);
 
 		return add_query_arg( $params );
@@ -323,7 +367,7 @@ class WC_Product_CSV_Importer_Controller {
 				'test_form' => false,
 				'mimes'     => self::get_valid_csv_filetypes(),
 			);
-			$import    = $_FILES['import']; // WPCS: sanitization ok, input var ok.
+			$import    = $_FILES['import']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
 			$upload    = wp_handle_upload( $import, $overrides );
 
 			if ( isset( $upload['error'] ) ) {
@@ -368,8 +412,9 @@ class WC_Product_CSV_Importer_Controller {
 	protected function mapping_form() {
 		check_admin_referer( 'woocommerce-csv-importer' );
 		$args = array(
-			'lines'     => 1,
-			'delimiter' => $this->delimiter,
+			'lines'              => 1,
+			'delimiter'          => $this->delimiter,
+			'character_encoding' => $this->character_encoding,
 		);
 
 		$importer     = self::get_importer( $this->file, $args );
@@ -429,14 +474,15 @@ class WC_Product_CSV_Importer_Controller {
 
 		wp_localize_script(
 			'wc-product-import', 'wc_product_import_params', array(
-				'import_nonce'    => wp_create_nonce( 'wc-product-import' ),
-				'mapping'         => array(
+				'import_nonce'       => wp_create_nonce( 'wc-product-import' ),
+				'mapping'            => array(
 					'from' => $mapping_from,
 					'to'   => $mapping_to,
 				),
-				'file'            => $this->file,
-				'update_existing' => $this->update_existing,
-				'delimiter'       => $this->delimiter,
+								'file'               => $this->file,
+				'update_existing'    => $this->update_existing,
+				'delimiter'          => $this->delimiter,
+				'character_encoding' => $this->character_encoding,
 			)
 		);
 		wp_enqueue_script( 'wc-product-import' );
@@ -449,11 +495,13 @@ class WC_Product_CSV_Importer_Controller {
 	 */
 	protected function done() {
 		check_admin_referer( 'woocommerce-csv-importer' );
-		$imported = isset( $_GET['products-imported'] ) ? absint( $_GET['products-imported'] ) : 0;
-		$updated  = isset( $_GET['products-updated'] ) ? absint( $_GET['products-updated'] ) : 0;
-		$failed   = isset( $_GET['products-failed'] ) ? absint( $_GET['products-failed'] ) : 0;
-		$skipped  = isset( $_GET['products-skipped'] ) ? absint( $_GET['products-skipped'] ) : 0;
-		$errors   = array_filter( (array) get_user_option( 'product_import_error_log' ) );
+		$imported            = isset( $_GET['products-imported'] ) ? absint( $_GET['products-imported'] ) : 0;
+		$imported_variations = isset( $_GET['products-imported-variations'] ) ? absint( $_GET['products-imported-variations'] ) : 0;
+		$updated             = isset( $_GET['products-updated'] ) ? absint( $_GET['products-updated'] ) : 0;
+		$failed              = isset( $_GET['products-failed'] ) ? absint( $_GET['products-failed'] ) : 0;
+		$skipped             = isset( $_GET['products-skipped'] ) ? absint( $_GET['products-skipped'] ) : 0;
+		$file_name           = isset( $_GET['file-name'] ) ? sanitize_text_field( wp_unslash( $_GET['file-name'] ) ) : '';
+		$errors              = array_filter( (array) get_user_option( 'product_import_error_log' ) );
 
 		include_once dirname( __FILE__ ) . '/views/html-csv-import-done.php';
 	}
@@ -558,6 +606,8 @@ class WC_Product_CSV_Importer_Controller {
 						/* translators: %d: Attribute number */
 						__( 'Attribute %d default', 'classic-commerce' ) => 'attributes:default',
 						/* translators: %d: Download number */
+                        __( 'Download %d ID', 'classic-commerce' ) => 'downloads:id',
+						/* translators: %d: Download number */
 						__( 'Download %d name', 'classic-commerce' ) => 'downloads:name',
 						/* translators: %d: Download number */
 						__( 'Download %d URL', 'classic-commerce' ) => 'downloads:url',
@@ -570,14 +620,15 @@ class WC_Product_CSV_Importer_Controller {
 
 		$headers = array();
 		foreach ( $raw_headers as $key => $field ) {
-			$field             = strtolower( $field );
+			$normalized_field             = strtolower( $field );
 			$index             = $num_indexes ? $key : $field;
-			$headers[ $index ] = $field;
+			$headers[ $index ] = $normalized_field;
 
-			if ( isset( $default_columns[ $field ] ) ) {
-				$headers[ $index ] = $default_columns[ $field ];
+			if ( isset( $default_columns[ $normalized_field ] ) ) {
+				$headers[ $index ] = $default_columns[ $normalized_field ];
 			} else {
 				foreach ( $special_columns as $regex => $special_key ) {
+                    // Don't use the normalized field in the regex since meta might be case-sensitive.
 					if ( preg_match( $regex, $field, $matches ) ) {
 						$headers[ $index ] = $special_key . $matches[1];
 						break;
@@ -612,7 +663,7 @@ class WC_Product_CSV_Importer_Controller {
 	 * @return string
 	 */
 	protected function sanitize_special_column_name_regex( $value ) {
-		return '/' . str_replace( array( '%d', '%s' ), '(.*)', trim( quotemeta( $value ) ) ) . '/';
+		return '/' . str_replace( array( '%d', '%s' ), '(.*)', trim( quotemeta( $value ) ) ) . '/i';
 	}
 
 	/**
@@ -719,6 +770,7 @@ class WC_Product_CSV_Importer_Controller {
 			'attributes'         => array(
 				'name'    => __( 'Attributes', 'classic-commerce' ),
 				'options' => array(
+                    'downloads:id' . $index   => __( 'Download ID', 'classic-commerce' ),
 					'attributes:name' . $index     => __( 'Attribute name', 'classic-commerce' ),
 					'attributes:value' . $index    => __( 'Attribute value(s)', 'classic-commerce' ),
 					'attributes:taxonomy' . $index => __( 'Is a global attribute?', 'classic-commerce' ),

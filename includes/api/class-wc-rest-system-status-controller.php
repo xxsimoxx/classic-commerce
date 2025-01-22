@@ -4,8 +4,8 @@
  *
  * Handles requests to the /system_status endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * System status controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_System_Status_V2_Controller
  */
 class WC_REST_System_Status_Controller extends WC_REST_System_Status_V2_Controller {

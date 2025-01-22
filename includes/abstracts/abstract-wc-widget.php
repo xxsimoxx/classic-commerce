@@ -62,6 +62,7 @@ abstract class WC_Widget extends WP_Widget {
 			'classname'   => $this->widget_cssclass,
 			'description' => $this->widget_description,
 			'customize_selective_refresh' => true,
+            'show_instance_in_rest'       => true,
 		);
 
 		parent::__construct( $this->widget_id, $this->widget_name, $widget_ops );
@@ -225,7 +226,7 @@ abstract class WC_Widget extends WP_Widget {
 				case 'text':
 					?>
 					<p>
-						<label for="<?php echo esc_attr( $this->get_field_id( $key ) ); ?>"><?php echo $setting['label']; ?></label><?php // phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped ?>
+                        <label for="<?php echo esc_attr( $this->get_field_id( $key ) ); ?>"><?php echo $setting['label']; /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></label>
 						<input class="widefat <?php echo esc_attr( $class ); ?>" id="<?php echo esc_attr( $this->get_field_id( $key ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( $key ) ); ?>" type="text" value="<?php echo esc_attr( $value ); ?>" />
 					</p>
 					<?php
@@ -327,6 +328,11 @@ abstract class WC_Widget extends WP_Widget {
 		// Post Type Arg.
 		if ( isset( $_GET['post_type'] ) ) {
 			$link = add_query_arg( 'post_type', wc_clean( wp_unslash( $_GET['post_type'] ) ), $link );
+
+            // Prevent post type and page id when pretty permalinks are disabled.
+			if ( is_shop() ) {
+				$link = remove_query_arg( 'page_id', $link );
+			}
 		}
 
 		// Min Rating Arg.
@@ -335,7 +341,7 @@ abstract class WC_Widget extends WP_Widget {
 		}
 
 		// All current filters.
-		if ( $_chosen_attributes = WC_Query::get_layered_nav_chosen_attributes() ) { // phpcs:ignore Squiz.PHP.DisallowMultipleAssignments.Found, WordPress.CodeAnalysis.AssignmentInCondition.Found
+		if ( $_chosen_attributes = WC_Query::get_layered_nav_chosen_attributes() ) { // phpcs:ignore Squiz.PHP.DisallowMultipleAssignments.FoundInControlStructure, WordPress.CodeAnalysis.AssignmentInCondition.Found
 			foreach ( $_chosen_attributes as $name => $data ) {
 				$filter_name = sanitize_title( str_replace( 'pa_', '', $name ) );
 				if ( ! empty( $data['terms'] ) ) {
@@ -347,7 +353,7 @@ abstract class WC_Widget extends WP_Widget {
 			}
 		}
 
-		return $link;
+		return apply_filters( 'woocommerce_widget_get_current_page_url', $link, $this );
 	}
 
 	/**

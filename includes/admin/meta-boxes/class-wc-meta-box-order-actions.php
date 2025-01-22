@@ -4,8 +4,6 @@
  *
  * Functions for displaying the order actions meta box.
  *
- * @author      WooThemes
- * @category    Admin
  * @package     ClassicCommerce/Admin/Meta Boxes
  * @version     WC-2.1.0
  */
@@ -28,17 +26,13 @@ class WC_Meta_Box_Order_Actions {
 		global $theorder;
 
 		// This is used by some callbacks attached to hooks such as woocommerce_order_actions which rely on the global to determine if actions should be displayed for certain orders.
+        // Avoid using this global with the `woocommerce_order_actions` filter, instead use the $order filter arg.
 		if ( ! is_object( $theorder ) ) {
 			$theorder = wc_get_order( $post->ID );
 		}
 
-		$order_actions = apply_filters(
-			'woocommerce_order_actions', array(
-				'send_order_details'              => __( 'Email invoice / order details to customer', 'classic-commerce' ),
-				'send_order_details_admin'        => __( 'Resend new order notification', 'classic-commerce' ),
-				'regenerate_download_permissions' => __( 'Regenerate download permissions', 'classic-commerce' ),
-			)
-		);
+		$theorder = $theorder instanceof WC_Order ? $theorder : null;
+		$order_actions = self::get_available_order_actions_for_order( $theorder );
 		?>
 		<ul class="order_actions submitbox">
 
@@ -62,7 +56,7 @@ class WC_Meta_Box_Order_Actions {
 						if ( ! EMPTY_TRASH_DAYS ) {
 							$delete_text = __( 'Delete permanently', 'classic-commerce' );
 						} else {
-							$delete_text = __( 'Move to trash', 'classic-commerce' );
+							$delete_text = __( 'Move to Trash', 'classic-commerce' );
 						}
 						?>
 						<a class="submitdelete deletion" href="<?php echo esc_url( get_delete_post_link( $post->ID ) ); ?>"><?php echo esc_html( $delete_text ); ?></a>
@@ -117,7 +111,7 @@ class WC_Meta_Box_Order_Actions {
 
 				WC()->payment_gateways();
 				WC()->shipping();
-				WC()->mailer()->emails['WC_Email_New_Order']->trigger( $order->get_id(), $order );
+				WC()->mailer()->emails['WC_Email_New_Order']->trigger( $order->get_id(), $order, true );
 
 				do_action( 'woocommerce_after_resend_order_email', $order, 'new_order' );
 
@@ -149,5 +143,34 @@ class WC_Meta_Box_Order_Actions {
 	 */
 	public static function set_email_sent_message( $location ) {
 		return add_query_arg( 'message', 11, $location );
+	}
+
+    /**
+	 * Get the available order actions for a given order.
+	 *
+	 * @since 5.8.0
+	 *
+     * @param WC_Order|null $order The order object or null if no order is available.
+	 *
+	 * @return array
+	 */
+	private static function get_available_order_actions_for_order( $order ) {
+		$actions = array(
+			'send_order_details'              => __( 'Send order details to customer', 'classic-commerce' ),
+			'send_order_details_admin'        => __( 'Resend new order notification', 'classic-commerce' ),
+			'regenerate_download_permissions' => __( 'Regenerate download permissions', 'classic-commerce' ),
+		);
+
+		/**
+		 * Filter: woocommerce_order_actions
+		 * Allows filtering of the available order actions for an order.
+		 *
+		 * @since 2.1.0 Filter was added.
+		 * @since 5.8.0 The $order param was added.
+		 *
+		 * @param array         $actions The available order actions for the order.
+		 * @param WC_Order|null $order   The order object or null if no order is available.
+		 */
+		return apply_filters( 'woocommerce_order_actions', $actions, $order );
 	}
 }

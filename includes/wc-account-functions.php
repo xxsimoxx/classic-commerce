@@ -22,6 +22,11 @@ function wc_lostpassword_url( $default_url = '' ) {
 		return $default_url;
 	}
 
+    // Don't change the admin form.
+	if ( did_action( 'login_form_login' ) ) {
+		return $default_url;
+	}
+
 	// Don't redirect to the woocommerce endpoint on global network admin lost passwords.
 	if ( is_multisite() && isset( $_GET['redirect_to'] ) && false !== strpos( wp_unslash( $_GET['redirect_to'] ), network_admin_url() ) ) { // WPCS: input var ok, sanitization ok, CSRF ok.
 		return $default_url;
@@ -61,7 +66,8 @@ function wc_customer_edit_account_url() {
  */
 function wc_edit_address_i18n( $id, $flip = false ) {
 	$slugs = apply_filters(
-		'woocommerce_edit_address_slugs', array(
+		'woocommerce_edit_address_slugs',
+        array(
 			'billing'  => sanitize_title( _x( 'billing', 'edit-address-slug', 'classic-commerce' ) ),
 			'shipping' => sanitize_title( _x( 'shipping', 'edit-address-slug', 'classic-commerce' ) ),
 		)
@@ -98,10 +104,10 @@ function wc_get_account_menu_items() {
 		'dashboard'       => __( 'Dashboard', 'classic-commerce' ),
 		'orders'          => __( 'Orders', 'classic-commerce' ),
 		'downloads'       => __( 'Downloads', 'classic-commerce' ),
-		'edit-address'    => __( 'Addresses', 'classic-commerce' ),
+		'edit-address'    => _n( 'Address', 'Addresses', ( 1 + (int) wc_shipping_enabled() ), 'classic-commerce' ),
 		'payment-methods' => __( 'Payment methods', 'classic-commerce' ),
 		'edit-account'    => __( 'Account details', 'classic-commerce' ),
-		'customer-logout' => __( 'Logout', 'classic-commerce' ),
+		'customer-logout' => __( 'Log out', 'classic-commerce' ),
 	);
 
 	// Remove missing endpoints.
@@ -130,27 +136,41 @@ function wc_get_account_menu_items() {
 }
 
 /**
+ * Find current item in account menu.
+ *
+ * @since  WC-9.3.0
+ * @param  string $endpoint Endpoint.
+ * @return bool
+ */
+function wc_is_current_account_menu_item( $endpoint ) {
+	global $wp;
+
+	$current = isset( $wp->query_vars[ $endpoint ] );
+	if ( 'dashboard' === $endpoint && ( isset( $wp->query_vars['page'] ) || empty( $wp->query_vars ) ) ) {
+		$current = true; // Dashboard is not an endpoint, so needs a custom check.
+    } elseif ( 'orders' === $endpoint && isset( $wp->query_vars['view-order'] ) ) {
+		$current = true; // When looking at individual order, highlight Orders list item (to signify where in the menu the user currently is).
+        } elseif ( 'payment-methods' === $endpoint && isset( $wp->query_vars['add-payment-method'] ) ) {
+		$current = true;
+	}
+
+	return $current;
+}
+
+/**
  * Get account menu item classes.
  *
- * @since  WC-2.6.0
- * @param  string $endpoint Endpoint.
+ * @since WC-2.6.0
+ * @param string $endpoint Endpoint.
  * @return string
  */
 function wc_get_account_menu_item_classes( $endpoint ) {
-	global $wp;
-
 	$classes = array(
 		'woocommerce-MyAccount-navigation-link',
 		'woocommerce-MyAccount-navigation-link--' . $endpoint,
 	);
 
-	// Set current item class.
-	$current = isset( $wp->query_vars[ $endpoint ] );
-	if ( 'dashboard' === $endpoint && ( isset( $wp->query_vars['page'] ) || empty( $wp->query_vars ) ) ) {
-		$current = true; // Dashboard is not an endpoint, so needs a custom check.
-	}
-
-	if ( $current ) {
+	if ( wc_is_current_account_menu_item( $endpoint ) ) {
 		$classes[] = 'is-active';
 	}
 
@@ -185,8 +205,15 @@ function wc_get_account_endpoint_url( $endpoint ) {
  * @return array
  */
 function wc_get_account_orders_columns() {
-	$columns = apply_filters(
-		'woocommerce_account_orders_columns', array(
+	/**
+	 * Filters the array of My Account > Orders columns.
+	 *
+	 * @since 2.6.0
+	 * @param array $columns Array of column labels keyed by column IDs.
+	 */
+	return apply_filters(
+		'woocommerce_account_orders_columns',
+        array(
 			'order-number'  => __( 'Order', 'classic-commerce' ),
 			'order-date'    => __( 'Date', 'classic-commerce' ),
 			'order-status'  => __( 'Status', 'classic-commerce' ),
@@ -194,9 +221,6 @@ function wc_get_account_orders_columns() {
 			'order-actions' => __( 'Actions', 'classic-commerce' ),
 		)
 	);
-
-	// Deprecated filter since 2.6.0.
-	return apply_filters( 'woocommerce_my_account_my_orders_columns', $columns );
 }
 
 /**
@@ -207,7 +231,8 @@ function wc_get_account_orders_columns() {
  */
 function wc_get_account_downloads_columns() {
 	$columns = apply_filters(
-		'woocommerce_account_downloads_columns', array(
+		'woocommerce_account_downloads_columns',
+        array(
 			'download-product'   => __( 'Product', 'classic-commerce' ),
 			'download-remaining' => __( 'Downloads remaining', 'classic-commerce' ),
 			'download-expires'   => __( 'Expires', 'classic-commerce' ),
@@ -231,7 +256,8 @@ function wc_get_account_downloads_columns() {
  */
 function wc_get_account_payment_methods_columns() {
 	return apply_filters(
-		'woocommerce_account_payment_methods_columns', array(
+		'woocommerce_account_payment_methods_columns',
+        array(
 			'method'  => __( 'Method', 'classic-commerce' ),
 			'expires' => __( 'Expires', 'classic-commerce' ),
 			'actions' => '&nbsp;',

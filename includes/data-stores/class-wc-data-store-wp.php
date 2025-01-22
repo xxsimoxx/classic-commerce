@@ -38,9 +38,19 @@ class WC_Data_Store_WP {
 	 * Data stored in meta keys, but not considered "meta" for an object.
 	 *
 	 * @since WC-3.0.0
+     *
 	 * @var array
 	 */
 	protected $internal_meta_keys = array();
+
+    /**
+	 * Meta data which should exist in the DB, even if empty.
+	 *
+	 * @since 3.6.0
+	 *
+	 * @var array
+	 */
+	protected $must_exist_meta_keys = array();
 
 	/**
 	 * Get and store terms from a taxonomy.
@@ -84,6 +94,20 @@ class WC_Data_Store_WP {
 				$object->get_id()
 			)
 		);
+        return $this->filter_raw_meta_data( $object, $raw_meta_data );
+	}
+
+	/**
+	 * Helper method to filter internal meta keys from all meta data rows for the object.
+	 *
+	 * @since 4.7.0
+	 *
+	 * @param WC_Data $object        WC_Data object.
+	 * @param array   $raw_meta_data Array of std object of meta data to be filtered.
+	 *
+	 * @return mixed|void
+	 */
+	public function filter_raw_meta_data( &$object, $raw_meta_data ) {
 
 		$this->internal_meta_keys = array_merge( array_map( array( $this, 'prefix_key' ), $object->get_data_keys() ), $this->internal_meta_keys );
 		$meta_data                = array_filter( $raw_meta_data, array( $this, 'exclude_internal_meta_keys' ) );
@@ -207,6 +231,33 @@ class WC_Data_Store_WP {
 		return $props_to_update;
 	}
 
+    /**
+	 * Update meta data in, or delete it from, the database.
+	 *
+	 * Avoids storing meta when it's either an empty string or empty array.
+	 * Other empty values such as numeric 0 and null should still be stored.
+	 * Data-stores can force meta to exist using `must_exist_meta_keys`.
+	 *
+	 * Note: WordPress `get_metadata` function returns an empty string when meta data does not exist.
+	 *
+	 * @param WC_Data $object The WP_Data object (WC_Coupon for coupons, etc).
+	 * @param string  $meta_key Meta key to update.
+	 * @param mixed   $meta_value Value to save.
+	 *
+	 * @since 3.6.0 Added to prevent empty meta being stored unless required.
+	 *
+	 * @return bool True if updated/deleted.
+	 */
+	protected function update_or_delete_post_meta( $object, $meta_key, $meta_value ) {
+		if ( in_array( $meta_value, array( array(), '' ), true ) && ! in_array( $meta_key, $this->must_exist_meta_keys, true ) ) {
+			$updated = delete_post_meta( $object->get_id(), $meta_key );
+		} else {
+			$updated = update_post_meta( $object->get_id(), $meta_key, $meta_value );
+		}
+
+		return (bool) $updated;
+	}
+
 	/**
 	 * Get valid WP_Query args from a WC_Object_Query's query variables.
 	 *
@@ -219,7 +270,7 @@ class WC_Data_Store_WP {
 		$skipped_values = array( '', array(), null );
 		$wp_query_args  = array(
 			'errors'     => array(),
-			'meta_query' => array(), // phpcs:ignore WordPress.VIP.SlowDBQuery.slow_db_query_meta_query
+			'meta_query' => array(), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 		);
 
 		foreach ( $query_vars as $key => $value ) {
@@ -377,7 +428,7 @@ class WC_Data_Store_WP {
 
 		// Build meta query for unrecognized keys.
 		if ( ! isset( $wp_query_args['meta_query'] ) ) {
-			$wp_query_args['meta_query'] = array(); // phpcs:ignore WordPress.VIP.SlowDBQuery.slow_db_query_meta_query
+			$wp_query_args['meta_query'] = array(); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 		}
 
 		// Meta dates are stored as timestamps in the db.
@@ -507,5 +558,48 @@ class WC_Data_Store_WP {
 		);
 
 		return apply_filters( 'wp_search_stopwords', $stopwords );
+	}
+
+    /**
+	 * Update a lookup table for an object.
+	 *
+	 * @since 3.6.0
+	 * @param int    $id ID of object to update.
+	 * @param string $table Lookup table name.
+     *
+	 * @return NULL
+	 */
+	protected function update_lookup_table( $id, $table ) {
+		global $wpdb;
+
+		$id    = absint( $id );
+		$table = sanitize_key( $table );
+
+		if ( empty( $id ) || empty( $table ) ) {
+			return false;
+		}
+
+		$existing_data = wp_cache_get( 'lookup_table', 'object_' . $id );
+		$update_data   = $this->get_data_for_lookup_table( $id, $table );
+
+		if ( ! empty( $update_data ) && $update_data !== $existing_data ) {
+			$wpdb->replace(
+				$wpdb->$table,
+				$update_data
+			);
+			wp_cache_set( 'lookup_table', $update_data, 'object_' . $id );
+		}
+	}
+
+    /**
+	 * Converts a WP post date string into a timestamp.
+	 *
+	 * @since 4.8.0
+	 *
+	 * @param  string $time_string The WP post date string.
+	 * @return int|null The date string converted to a timestamp or null.
+	 */
+	protected function string_to_timestamp( $time_string ) {
+		return '0000-00-00 00:00:00' !== $time_string ? wc_string_to_timestamp( $time_string ) : null;
 	}
 }

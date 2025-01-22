@@ -4,8 +4,8 @@
  *
  * Handles requests to the /data endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.5.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.5.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Data controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Controller
  */
 class WC_REST_Data_Controller extends WC_REST_Controller {
@@ -35,7 +35,7 @@ class WC_REST_Data_Controller extends WC_REST_Controller {
 	/**
 	 * Register routes.
 	 *
-	 * @since WC-3.5.0
+	 * @since 3.5.0
 	 */
 	public function register_routes() {
 		register_rest_route(
@@ -81,7 +81,7 @@ class WC_REST_Data_Controller extends WC_REST_Controller {
 	/**
 	 * Return the list of data resources.
 	 *
-	 * @since  WC-3.5.0
+	 * @since  3.5.0
 	 * @param  WP_REST_Request $request Request data.
 	 * @return WP_Error|WP_REST_Response
 	 */
@@ -155,7 +155,7 @@ class WC_REST_Data_Controller extends WC_REST_Controller {
 	/**
 	 * Get the data index schema, conforming to JSON Schema.
 	 *
-	 * @since  WC-3.5.0
+	 * @since  3.5.0
 	 * @return array
 	 */
 	public function get_item_schema() {

@@ -6,10 +6,6 @@
  * @package ClassicCommerce/Interface
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * WC Order Data Store Interface
  *

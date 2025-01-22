@@ -1,11 +1,11 @@
 <?php
 /**
- * Classic Commerce Shipping
+ * WooCommerce Shipping
  *
  * Handles shipping and loads shipping methods via hooks.
  *
- * @version WC-2.6.0
- * @package ClassicCommerce/Classes/Shipping
+ * @version 2.6.0
+ * @package ClassicCommerce\Classes\Shipping
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -48,8 +48,8 @@ class WC_Shipping {
 	/**
 	 * The single instance of the class
 	 *
-	 * @var   WC_Shipping
-	 * @since WC-2.1
+	 * @var WC_Shipping
+	 * @since 2.1
 	 */
 	protected static $_instance = null;
 
@@ -58,7 +58,7 @@ class WC_Shipping {
 	 *
 	 * Ensures only one instance of WC_Shipping is loaded or can be loaded.
 	 *
-	 * @since  WC-2.1
+	 * @since 2.1
 	 * @return WC_Shipping Main instance
 	 */
 	public static function instance() {
@@ -71,7 +71,7 @@ class WC_Shipping {
 	/**
 	 * Cloning is forbidden.
 	 *
-	 * @since WC-2.1
+	 * @since 2.1
 	 */
 	public function __clone() {
 		wc_doing_it_wrong( __FUNCTION__, __( 'Cloning is forbidden.', 'classic-commerce' ), '2.1' );
@@ -80,7 +80,7 @@ class WC_Shipping {
 	/**
 	 * Unserializing instances of this class is forbidden.
 	 *
-	 * @since WC-2.1
+	 * @since 2.1
 	 */
 	public function __wakeup() {
 		wc_doing_it_wrong( __FUNCTION__, __( 'Unserializing instances of this class is forbidden.', 'classic-commerce' ), '2.1' );
@@ -95,10 +95,10 @@ class WC_Shipping {
 	public function __get( $name ) {
 		// Grab from cart for backwards compatibility with versions prior to 3.2.
 		if ( 'shipping_total' === $name ) {
-			return wc()->cart->get_shipping_total();
+			return WC()->cart->get_shipping_total();
 		}
 		if ( 'shipping_taxes' === $name ) {
-			return wc()->cart->get_shipping_taxes();
+			return WC()->cart->get_shipping_taxes();
 		}
 	}
 
@@ -148,10 +148,10 @@ class WC_Shipping {
 
 	/**
 	 * Loads all shipping methods which are hooked in.
-	 * If a $package is passed some methods may add themselves conditionally and zones will be used.
+	 * If a $package is passed, some methods may add themselves conditionally and zones will be used.
 	 *
 	 * @param array $package Package information.
-	 * @return array
+	 * @return WC_Shipping_Method[]
 	 */
 	public function load_shipping_methods( $package = array() ) {
 		if ( ! empty( $package ) ) {
@@ -159,9 +159,12 @@ class WC_Shipping {
 			$shipping_zone          = WC_Shipping_Zones::get_zone_matching_package( $package );
 			$this->shipping_methods = $shipping_zone->get_shipping_methods( true );
 
+			// translators: %s: shipping zone name.
+			$matched_zone_notice = sprintf( __( 'Customer matched zone "%s"', 'classic-commerce' ), $shipping_zone->get_zone_name() );
+
 			// Debug output.
-			if ( $debug_mode && ! defined( 'WOOCOMMERCE_CHECKOUT' ) && ! defined( 'WC_DOING_AJAX' ) && ! wc_has_notice( 'Customer matched zone "' . $shipping_zone->get_zone_name() . '"' ) ) {
-				wc_add_notice( 'Customer matched zone "' . $shipping_zone->get_zone_name() . '"' );
+			if ( $debug_mode && ! defined( 'WOOCOMMERCE_CHECKOUT' ) && ! defined( 'WC_DOING_AJAX' ) && ! wc_has_notice( $matched_zone_notice ) ) {
+				wc_add_notice( $matched_zone_notice );
 			}
 		} else {
 			$this->shipping_methods = array();
@@ -209,7 +212,7 @@ class WC_Shipping {
 	/**
 	 * Returns all registered shipping methods for usage.
 	 *
-	 * @return array
+	 * @return WC_Shipping_Method[]
 	 */
 	public function get_shipping_methods() {
 		if ( is_null( $this->shipping_methods ) ) {
@@ -226,7 +229,8 @@ class WC_Shipping {
 	public function get_shipping_classes() {
 		if ( empty( $this->shipping_classes ) ) {
 			$classes                = get_terms(
-				'product_shipping_class', array(
+				'product_shipping_class',
+				array(
 					'hide_empty' => '0',
 					'orderby'    => 'name',
 				)
@@ -261,7 +265,7 @@ class WC_Shipping {
 		 * but before WooCommerce does anything with them. A good example of usage is to merge the shipping methods for multiple
 		 * packages for marketplaces.
 		 *
-		 * @since WC-2.6.0
+		 * @since 2.6.0
 		 *
 		 * @param array $packages The array of packages after shipping costs are calculated.
 		 */
@@ -278,8 +282,7 @@ class WC_Shipping {
 	 * @param  array $package Package of cart items.
 	 * @return bool
 	 */
-	protected function is_package_shippable( $package ) {
-
+	public function is_package_shippable( $package ) {
 		// Packages are shippable until proven otherwise.
 		if ( empty( $package['destination']['country'] ) ) {
 			return true;
@@ -308,40 +311,72 @@ class WC_Shipping {
 		$package['rates'] = array();
 
 		// If the package is not shippable, e.g. trying to ship to an invalid country, do not calculate rates.
-		if ( $this->is_package_shippable( $package ) ) {
-			// Check if we need to recalculate shipping for this package.
-			$package_to_hash = $package;
-
-			// Remove data objects so hashes are consistent.
-			foreach ( $package_to_hash['contents'] as $item_id => $item ) {
-				unset( $package_to_hash['contents'][ $item_id ]['data'] );
-			}
-
-			$package_hash = 'wc_ship_' . md5( wp_json_encode( $package_to_hash ) . WC_Cache_Helper::get_transient_version( 'shipping' ) );
-			$session_key  = 'shipping_for_package_' . $package_key;
-			$stored_rates = WC()->session->get( $session_key );
-
-			if ( ! is_array( $stored_rates ) || $package_hash !== $stored_rates['package_hash'] || 'yes' === get_option( 'woocommerce_shipping_debug_mode', 'no' ) ) {
-				foreach ( $this->load_shipping_methods( $package ) as $shipping_method ) {
-					if ( ! $shipping_method->supports( 'shipping-zones' ) || $shipping_method->get_instance_id() ) {
-						$package['rates'] = $package['rates'] + $shipping_method->get_rates_for_package( $package ); // + instead of array_merge maintains numeric keys
-					}
-				}
-
-				// Filter the calculated rates.
-				$package['rates'] = apply_filters( 'woocommerce_package_rates', $package['rates'], $package );
-
-				// Store in session to avoid recalculation.
-				WC()->session->set(
-					$session_key, array(
-						'package_hash' => $package_hash,
-						'rates'        => $package['rates'],
-					)
-				);
-			} else {
-				$package['rates'] = $stored_rates['rates'];
-			}
+		if ( ! $this->is_package_shippable( $package ) ) {
+			return $package;
 		}
+
+		// Check if we need to recalculate shipping for this package.
+		$package_to_hash = $package;
+
+		// Remove data objects so hashes are consistent.
+		foreach ( $package_to_hash['contents'] as $item_id => $item ) {
+			unset( $package_to_hash['contents'][ $item_id ]['data'] );
+		}
+
+		// Get rates stored in the WC session data for this package.
+		$wc_session_key = 'shipping_for_package_' . $package_key;
+		$stored_rates   = WC()->session->get( $wc_session_key );
+
+		// Calculate the hash for this package so we can tell if it's changed since last calculation.
+		$package_hash = 'wc_ship_' . md5( wp_json_encode( $package_to_hash ) . WC_Cache_Helper::get_transient_version( 'shipping' ) );
+
+		if ( ! is_array( $stored_rates ) || $package_hash !== $stored_rates['package_hash'] || 'yes' === get_option( 'woocommerce_shipping_debug_mode', 'no' ) ) {
+			foreach ( $this->load_shipping_methods( $package ) as $shipping_method ) {
+				if ( ! $shipping_method->supports( 'shipping-zones' ) || $shipping_method->get_instance_id() ) {
+					/**
+					 * Fires before getting shipping rates for a package.
+					 *
+					 * @since 4.3.0
+					 * @param array $package Package of cart items.
+					 * @param WC_Shipping_Method $shipping_method Shipping method instance.
+					 */
+					do_action( 'woocommerce_before_get_rates_for_package', $package, $shipping_method );
+
+					// Use + instead of array_merge to maintain numeric keys.
+					$package['rates'] = $package['rates'] + $shipping_method->get_rates_for_package( $package );
+
+					/**
+					 * Fires after getting shipping rates for a package.
+					 *
+					 * @since 4.3.0
+					 * @param array $package Package of cart items.
+					 * @param WC_Shipping_Method $shipping_method Shipping method instance.
+					 */
+					do_action( 'woocommerce_after_get_rates_for_package', $package, $shipping_method );
+				}
+			}
+
+			/**
+			 * Filter the calculated shipping rates.
+			 *
+			 * @see https://gist.github.com/woogists/271654709e1d27648546e83253c1a813 for cache invalidation methods.
+			 * @param array $package['rates'] Package rates.
+			 * @param array $package Package of cart items.
+			 */
+			$package['rates'] = apply_filters( 'woocommerce_package_rates', $package['rates'], $package );
+
+			// Store in session to avoid recalculation.
+			WC()->session->set(
+				$wc_session_key,
+				array(
+					'package_hash' => $package_hash,
+					'rates'        => $package['rates'],
+				)
+			);
+		} else {
+			$package['rates'] = $stored_rates['rates'];
+		}
+
 		return $package;
 	}
 
@@ -367,7 +402,7 @@ class WC_Shipping {
 	/**
 	 * Deprecated
 	 *
-	 * @deprecated WC-2.6.0 Was previously used to determine sort order of methods, but this is now controlled by zones and thus unused.
+	 * @deprecated 2.6.0 Was previously used to determine sort order of methods, but this is now controlled by zones and thus unused.
 	 */
 	public function sort_shipping_methods() {
 		wc_deprecated_function( 'sort_shipping_methods', '2.6' );

@@ -49,7 +49,7 @@ $exporter = new WC_Product_CSV_Exporter();
 							<td>
 								<select id="woocommerce-exporter-types" class="woocommerce-exporter-types wc-enhanced-select" style="width:100%;" multiple data-placeholder="<?php esc_attr_e( 'Export all products', 'classic-commerce' ); ?>">
 									<?php
-									foreach ( wc_get_product_types() as $value => $label ) {
+									foreach (  WC_Admin_Exporters::get_product_types() as $value => $label ) {
 										echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
 									}
 									?>
@@ -64,10 +64,17 @@ $exporter = new WC_Product_CSV_Exporter();
 							<td>
 								<select id="woocommerce-exporter-category" class="woocommerce-exporter-category wc-enhanced-select" style="width:100%;" multiple data-placeholder="<?php esc_attr_e( 'Export all categories', 'classic-commerce' ); ?>">
 								<?php
-								foreach ( get_categories( array( 'taxonomy' => 'product_cat' ) ) as $category ) {
+								$categories = get_categories(
+									array(
+										'taxonomy'   => 'product_cat',
+										'hide_empty' => false,
+									)
+								);
+								foreach ( $categories as $category ) {
 									echo '<option value="' . esc_attr( $category->slug ) . '">' . esc_html( $category->name ) . '</option>';
 								}
 								?>
+                                </select>
 							</td>
 						</tr>
 						<tr>

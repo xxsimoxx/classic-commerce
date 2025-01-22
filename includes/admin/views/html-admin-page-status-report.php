@@ -9,21 +9,29 @@ defined( 'ABSPATH' ) || exit;
 
 global $wpdb;
 
+// This screen requires classes from the REST API.
+if ( ! did_action( 'rest_api_init' ) ) {
+	WC()->api->rest_api_includes();
+}
+
 if ( ! class_exists( 'WC_REST_System_Status_Controller', false ) ) {
 	wp_die( 'Cannot load the REST API to access WC_REST_System_Status_Controller.' );
 }
 
-$system_status    = new WC_REST_System_Status_Controller();
-$environment      = $system_status->get_environment_info();
-$database         = $system_status->get_database_info();
-$post_type_counts = $system_status->get_post_type_counts();
-$active_plugins   = $system_status->get_active_plugins();
-$theme            = $system_status->get_theme_info();
-$security         = $system_status->get_security_info();
-$settings         = $system_status->get_settings();
-$pages            = $system_status->get_pages();
-$plugin_updates   = new WC_Plugin_Updates();
-$untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor' );
+$report             = wc()->api->get_endpoint_data( '/wc/v3/system_status' );
+$system_status      = new WC_REST_System_Status_Controller();
+$environment        = $system_status->get_environment_info();
+$database           = $system_status->get_database_info();
+$post_type_counts   = $system_status->get_post_type_counts();
+$active_plugins     = $system_status->get_active_plugins();
+$inactive_plugins   = $system_status->get_inactive_plugins();
+$dropins_mu_plugins = $system_status->get_dropins_mu_plugins();
+$theme              = $system_status->get_theme_info();
+$security           = $system_status->get_security_info();
+$settings           = $system_status->get_settings();
+$wp_pages           = $system_status->get_pages();
+$plugin_updates     = new WC_Plugin_Updates();
+$untested_plugins   = $plugin_updates->get_untested_plugins( WC()->version, 'minor' );
 ?>
 <div class="updated woocommerce-message inline">
 	<p>
@@ -50,19 +58,19 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 <table class="wc_status_table widefat" cellspacing="0" id="status">
 	<thead>
 		<tr>
-			<th colspan="3" data-export-label="CMS Environment"><h2><?php esc_html_e( 'CMS environment', 'classic-commerce' ); ?></h2></th>
+			<th colspan="3" data-export-label="WordPress Environment"><h2><?php esc_html_e( 'WordPress environment', 'classic-commerce' ); ?></h2></th>
 		</tr>
 	</thead>
 	<tbody>
 		<tr>
-			<td data-export-label="Home URL"><?php esc_html_e( 'Home URL', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'The homepage URL of your site.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
-			<td><?php echo esc_html( $environment['home_url'] ); ?></td>
-		</tr>
-		<tr>
-			<td data-export-label="Site URL"><?php esc_html_e( 'Site URL', 'classic-commerce' ); ?>:</td>
+			<td data-export-label="WordPress address (URL)"><?php esc_html_e( 'WordPress address (URL)', 'classic-commerce' ); ?>:</td>
 			<td class="help"><?php echo wc_help_tip( esc_html__( 'The root URL of your site.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td><?php echo esc_html( $environment['site_url'] ); ?></td>
+		</tr>
+		<tr>
+			<td data-export-label="Site address (URL)"><?php esc_html_e( 'Site address (URL)', 'classic-commerce' ); ?>:</td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'The homepage URL of your site.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td><?php echo esc_html( $environment['home_url'] ); ?></td>
 		</tr>
 		<tr>
 			<td data-export-label="CC Version"><?php esc_html_e( 'Classic Commerce version', 'classic-commerce' ); ?>:</td>
@@ -75,8 +83,28 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			<td><?php echo esc_html( $environment['version'] ); ?></td>
 		</tr>
 		<tr>
+			<td data-export-label="Action Scheduler Version"><?php esc_html_e( 'Action Scheduler package', 'classic-commerce' ); ?>:</td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'Action Scheduler package running on your site.', 'classic-commerce' ) ); ?></td>
+			<td>
+				<?php
+				if ( class_exists( 'ActionScheduler_Versions' ) && class_exists( 'ActionScheduler' ) ) {
+					$version = ActionScheduler_Versions::instance()->latest_version();
+					$path    = ActionScheduler::plugin_path( '' );
+				} else {
+					$version = null;
+				}
+
+				if ( ! is_null( $version ) ) {
+					echo '<mark class="yes"><span class="dashicons dashicons-yes"></span> ' . esc_html( $version ) . ' <code class="private">' . esc_html( $path ) . '</code></mark> ';
+				} else {
+					echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . esc_html__( 'Unable to detect the Action Scheduler package.', 'classic-commerce' ) . '</mark>';
+				}
+				?>
+			</td>
+		</tr>
+        <tr>
 			<td data-export-label="Log Directory Writable"><?php esc_html_e( 'Log directory writable', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'Several extensions can write logs which makes debugging problems easier. The directory must be writable for this to happen.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'Several Classic Commerce extensions can write logs which makes debugging problems easier. The directory must be writable for this to happen.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td>
 				<?php
 				if ( $environment['log_directory_writable'] ) {
@@ -123,18 +151,18 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			</td>
 		</tr>
 		<tr>
-			<td data-export-label="Multisite"><?php esc_html_e( 'Multisite', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'Whether or not you have Multisite enabled.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td data-export-label="WP Multisite"><?php esc_html_e( 'WordPress multisite', 'classic-commerce' ); ?>:</td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'Whether or not you have WordPress Multisite enabled.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td><?php echo ( $environment['wp_multisite'] ) ? '<span class="dashicons dashicons-yes"></span>' : '&ndash;'; ?></td>
 		</tr>
 		<tr>
-			<td data-export-label="Memory Limit"><?php esc_html_e( 'Memory limit', 'classic-commerce' ); ?>:</td>
+			<td data-export-label="WP Memory Limit"><?php esc_html_e( 'WordPress memory limit', 'classic-commerce' ); ?>:</td>
 			<td class="help"><?php echo wc_help_tip( esc_html__( 'The maximum amount of memory (RAM) that your site can use at one time.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td>
 				<?php
 				if ( $environment['wp_memory_limit'] < 67108864 ) {
 					/* Translators: %1$s: Memory limit, %2$s: Docs link. */
-					echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . sprintf( esc_html__( '%1$s - We recommend setting memory to at least 64MB. See: %2$s', 'classic-commerce' ), esc_html( size_format( $environment['wp_memory_limit'] ) ), '<a href="https://codex.wordpress.org/Editing_wp-config.php#Increasing_memory_allocated_to_PHP" target="_blank">' . esc_html__( 'Increasing memory allocated to PHP', 'classic-commerce' ) . '</a>' ) . '</mark>';
+					echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . sprintf( esc_html__( '%1$s - We recommend setting memory to at least 64MB. See: %2$s', 'classic-commerce' ), esc_html( size_format( $environment['wp_memory_limit'] ) ), '<a href="https://wordpress.org/support/article/editing-wp-config-php/#increasing-memory-allocated-to-php" target="_blank">' . esc_html__( 'Increasing memory allocated to PHP', 'classic-commerce' ) . '</a>' ) . '</mark>';
 				} else {
 					echo '<mark class="yes">' . esc_html( size_format( $environment['wp_memory_limit'] ) ) . '</mark>';
 				}
@@ -142,8 +170,8 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			</td>
 		</tr>
 		<tr>
-			<td data-export-label="Debug Mode"><?php esc_html_e( 'Debug mode', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'Displays whether or not your CMS is in Debug Mode.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td data-export-label="WP Debug Mode"><?php esc_html_e( 'WordPress debug mode', 'classic-commerce' ); ?>:</td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'Displays whether or not WordPress is in Debug Mode.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td>
 				<?php if ( $environment['wp_debug_mode'] ) : ?>
 					<mark class="yes"><span class="dashicons dashicons-yes"></span></mark>
@@ -153,8 +181,8 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			</td>
 		</tr>
 		<tr>
-			<td data-export-label="Cron"><?php esc_html_e( 'Cron', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'Displays whether or not Cron Jobs are enabled.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td data-export-label="WP Cron"><?php esc_html_e( 'WordPress cron', 'classic-commerce' ); ?>:</td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'Displays whether or not WP Cron Jobs are enabled.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td>
 				<?php if ( $environment['wp_cron'] ) : ?>
 					<mark class="yes"><span class="dashicons dashicons-yes"></span></mark>
@@ -165,12 +193,12 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 		</tr>
 		<tr>
 			<td data-export-label="Language"><?php esc_html_e( 'Language', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'The current language used by your CMS. Default = English', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'The current language used by WordPress. Default = English', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td><?php echo esc_html( $environment['language'] ); ?></td>
 		</tr>
 		<tr>
 			<td data-export-label="External object cache"><?php esc_html_e( 'External object cache', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'Displays whether or not your CMS is using an external object cache.', 'classic-commerce' ) ); ?></td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'Displays whether or not WordPress is using an external object cache.', 'classic-commerce' ) ); ?></td>
 			<td>
 				<?php if ( $environment['external_object_cache'] ) : ?>
 					<mark class="yes"><span class="dashicons dashicons-yes"></span></mark>
@@ -197,25 +225,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			<td data-export-label="PHP Version"><?php esc_html_e( 'PHP version', 'classic-commerce' ); ?>:</td>
 			<td class="help"><?php echo wc_help_tip( esc_html__( 'The version of PHP installed on your hosting server.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td>
-				<?php
-				if ( version_compare( $environment['php_version'], '7.2', '>=' ) ) {
-					echo '<mark class="yes">' . esc_html( $environment['php_version'] ) . '</mark>';
-				} else {
-					$update_link = ' <a href="https://classiccommerce.cc/usage-and-maintenance/update-php-version/" target="_blank">' . esc_html__( 'How to update your PHP version', 'classic-commerce' ) . '</a>';
-					$class       = 'error';
-
-					if ( version_compare( $environment['php_version'], '5.4', '<' ) ) {
-						$notice = '<span class="dashicons dashicons-warning"></span> ' . __( 'Classic Commerce will run under this version of PHP, however, some features such as geolocation are not compatible. Support for this version will be dropped in the next major release. We recommend using PHP version 7.2 or above for greater performance and security.', 'classic-commerce' ) . $update_link;
-					} elseif ( version_compare( $environment['php_version'], '5.6', '<' ) ) {
-						$notice = '<span class="dashicons dashicons-warning"></span> ' . __( 'Classic Commerce will run under this version of PHP, however, it has reached end of life. We recommend using PHP version 7.2 or above for greater performance and security.', 'classic-commerce' ) . $update_link;
-					} elseif ( version_compare( $environment['php_version'], '7.2', '<' ) ) {
-						$notice = __( 'We recommend using PHP version 7.2 or above for greater performance and security.', 'classic-commerce' ) . $update_link;
-						$class  = 'recommendation';
-					}
-
-					echo '<mark class="' . esc_attr( $class ) . '">' . esc_html( $environment['php_version'] ) . ' - ' . wp_kses_post( $notice ) . '</mark>';
-				}
-				?>
+				<?php echo '<mark class="yes">' . esc_html( $environment['php_version'] ) . '</mark>'; ?>
 			</td>
 		</tr>
 		<?php if ( function_exists( 'ini_get' ) ) : ?>
@@ -267,7 +277,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 		<?php endif; ?>
 		<tr>
 			<td data-export-label="Max Upload Size"><?php esc_html_e( 'Max upload size', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'The largest filesize that can be uploaded to your installation.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'The largest filesize that can be uploaded to your WordPress installation.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td><?php echo esc_html( size_format( $environment['max_upload_size'] ) ); ?></td>
 		</tr>
 		<tr>
@@ -369,7 +379,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 		</tr>
 		<tr>
 			<td data-export-label="Remote Get"><?php esc_html_e( 'Remote get', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'Plugins may use this method of communication when checking for plugin updates.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'Classic Commerce plugins may use this method of communication when checking for plugin updates.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td>
 				<?php
 				if ( $environment['remote_get_successful'] ) {
@@ -406,16 +416,23 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 		?>
 	</tbody>
 </table>
-<table class="wc_status_table widefat" cellspacing="0">
+<table id="status-database" class="wc_status_table widefat" cellspacing="0">
 	<thead>
 	<tr>
-		<th colspan="3" data-export-label="Database"><h2><?php esc_html_e( 'Database', 'classic-commerce' ); ?></h2></th>
+		<th colspan="3" data-export-label="Database">
+			<h2>
+				<?php
+					esc_html_e( 'Database', 'classic-commerce' );
+					self::output_tables_info();
+				?>
+			</h2>
+		</th>
 	</tr>
 	</thead>
 	<tbody>
 		<tr>
-			<td data-export-label="CC Database Version"><?php esc_html_e( 'Classic Commerce database version', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'The version of Classic Commerce that the database is formatted for. This should be the same as your Classic Commerce version.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td data-export-label="WC Database Version"><?php esc_html_e( 'Classic Commerce database version', 'classic-commerce' ); ?>:</td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'The database version for Classic Commerce. Note that it doesn&#10076;t match Classic Commerce version and that is normal. This should be the same as your WooCommerce equivalent version.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td><?php echo esc_html( $database['wc_database_version'] ); ?></td>
 		</tr>
 		<tr>
@@ -433,81 +450,75 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			</td>
 		</tr>
 
-		<?php if ( $settings['geolocation_enabled'] ) { ?>
+        <?php if ( ! empty( $database['database_size'] ) && ! empty( $database['database_tables'] ) ) : ?>
 			<tr>
-				<td data-export-label="MaxMind GeoIP Database"><?php esc_html_e( 'MaxMind GeoIP database', 'classic-commerce' ); ?>:</td>
-				<td class="help"><?php echo wc_help_tip( esc_html__( 'The GeoIP database from MaxMind is used to geolocate customers.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
-				<td>
-					<?php
-					if ( version_compare( $environment['php_version'], '5.4', '<' ) ) {
-						echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . wp_kses_post( __( 'MaxMind GeoIP database requires at least PHP 5.4.', 'classic-commerce' ) ) . '</mark>';
-					} elseif ( file_exists( $database['maxmind_geoip_database'] ) ) {
-						echo '<mark class="yes"><span class="dashicons dashicons-yes"></span> <code class="private">' . esc_html( $database['maxmind_geoip_database'] ) . '</code></mark> ';
-					} else {
-						/* Translators: %1$s: Library url, %2$s: install path. */
-						printf( '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . sprintf( esc_html__( 'The MaxMind GeoIP Database does not exist - Geolocation will not function. You can download and install it manually from %1$s to the path: %2$s. Scroll down to "Downloads" and download the "MaxMind DB binary, gzipped" file next to "GeoLite2 Country". Please remember to uncompress GeoLite2-Country_xxxxxxxx.tar.gz and upload the GeoLite2-Country.mmdb file only.', 'classic-commerce' ), '<a href="https://dev.maxmind.com/geoip/geoip2/geolite2/">https://dev.maxmind.com/geoip/geoip2/geolite2/</a>', '<code class="private">' . esc_html( $database['maxmind_geoip_database'] ) . '</code>' ) . '</mark>', esc_html( WC_LOG_DIR ) );
-					}
-					?>
-				</td>
+				<td><?php esc_html_e( 'Total Database Size', 'classic-commerce' ); ?></td>
+				<td class="help">&nbsp;</td>
+				<td><?php printf( '%.2fMB', esc_html( $database['database_size']['data'] + $database['database_size']['index'] ) ); ?></td>
 			</tr>
-		<?php } ?>
-
-		<tr>
-			<td><?php esc_html_e( 'Total Database Size', 'classic-commerce' ); ?></td>
-			<td class="help">&nbsp;</td>
-			<td><?php printf( '%.2fMB', esc_html( $database['database_size']['data'] + $database['database_size']['index'] ) ); ?></td>
-		</tr>
-
-		<tr>
-			<td><?php esc_html_e( 'Database Data Size', 'classic-commerce' ); ?></td>
-			<td class="help">&nbsp;</td>
-			<td><?php printf( '%.2fMB', esc_html( $database['database_size']['data'] ) ); ?></td>
-		</tr>
-
-		<tr>
-			<td><?php esc_html_e( 'Database Index Size', 'classic-commerce' ); ?></td>
-			<td class="help">&nbsp;</td>
-			<td><?php printf( '%.2fMB', esc_html( $database['database_size']['index'] ) ); ?></td>
-		</tr>
-
-		<?php foreach ( $database['database_tables']['woocommerce'] as $table => $table_data ) { ?>
 			<tr>
-				<td><?php echo esc_html( $table ); ?></td>
+				<td><?php esc_html_e( 'Database Data Size', 'classic-commerce' ); ?></td>
+				<td class="help">&nbsp;</td>
+				<td><?php printf( '%.2fMB', esc_html( $database['database_size']['data'] ) ); ?></td>
+			</tr>
+			<tr>
+				<td><?php esc_html_e( 'Database Index Size', 'classic-commerce' ); ?></td>
+				<td class="help">&nbsp;</td>
+				<td><?php printf( '%.2fMB', esc_html( $database['database_size']['index'] ) ); ?></td>
+			</tr>
+			<?php foreach ( $database['database_tables']['woocommerce'] as $table => $table_data ) { ?>
+				<tr>
+					<td><?php echo esc_html( $table ); ?></td>
+					<td class="help">&nbsp;</td>
+					<td>
+						<?php
+						if ( ! $table_data ) {
+							echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . esc_html__( 'Table does not exist', 'classic-commerce' ) . '</mark>';
+						} else {
+							/* Translators: %1$f: Table size, %2$f: Index size, %3$s Engine. */
+							printf( esc_html__( 'Data: %1$.2fMB + Index: %2$.2fMB + Engine %3$s', 'classic-commerce' ), esc_html( wc_format_decimal( $table_data['data'], 2 ) ), esc_html( wc_format_decimal( $table_data['index'], 2 ) ), esc_html( $table_data['engine'] ) );
+						}
+						?>
+					</td>
+				</tr>
+			<?php } ?>
+
+			<?php foreach ( $database['database_tables']['other'] as $table => $table_data ) { ?>
+				<tr>
+					<td><?php echo esc_html( $table ); ?></td>
+					<td class="help">&nbsp;</td>
+					<td>
+						<?php
+							/* Translators: %1$f: Table size, %2$f: Index size, %3$s Engine. */
+							printf( esc_html__( 'Data: %1$.2fMB + Index: %2$.2fMB + Engine %3$s', 'classic-commerce' ), esc_html( wc_format_decimal( $table_data['data'], 2 ) ), esc_html( wc_format_decimal( $table_data['index'], 2 ) ), esc_html( $table_data['engine'] ) );
+						?>
+					</td>
+				</tr>
+			<?php } ?>
+		<?php else : ?>
+			<tr>
+				<td><?php esc_html_e( 'Database information:', 'classic-commerce' ); ?></td>
 				<td class="help">&nbsp;</td>
 				<td>
 					<?php
-					if ( ! $table_data ) {
-						echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . esc_html__( 'Table does not exist', 'classic-commerce' ) . '</mark>';
-					} else {
-						/* Translators: %1$f: Table size, %2$f: Index size. */
-						printf( esc_html__( 'Data: %1$.2fMB + Index: %2$.2fMB', 'classic-commerce' ), esc_html( wc_format_decimal( $table_data['data'], 2 ) ), esc_html( wc_format_decimal( $table_data['index'], 2 ) ) );
-					}
+					esc_html_e(
+						'Unable to retrieve database information. Usually, this is not a problem, and it only means that your install is using a class that replaces the WordPress database class (e.g., HyperDB) and Classic Commerce is unable to get database information.',
+						'classic-commerce'
+					);
 					?>
 				</td>
 			</tr>
-		<?php } ?>
-
-		<?php foreach ( $database['database_tables']['other'] as $table => $table_data ) { ?>
-			<tr>
-				<td><?php echo esc_html( $table ); ?></td>
-				<td class="help">&nbsp;</td>
-				<td>
-					<?php
-					/* Translators: %1$f: Table size, %2$f: Index size. */
-					printf( esc_html__( 'Data: %1$.2fMB + Index: %2$.2fMB', 'classic-commerce' ), esc_html( wc_format_decimal( $table_data['data'], 2 ) ), esc_html( wc_format_decimal( $table_data['index'], 2 ) ) );
-					?>
-				</td>
-			</tr>
-		<?php } ?>
+		<?php endif; ?>
 	</tbody>
 </table>
-<table class="wc_status_table widefat" cellspacing="0">
-	<thead>
-	<tr>
-		<th colspan="3" data-export-label="Post Type Counts"><h2><?php esc_html_e( 'Post Type Counts', 'classic-commerce' ); ?></h2></th>
-	</tr>
-	</thead>
-	<tbody>
+<?php if ( $post_type_counts ) : ?>
+	<table class="wc_status_table widefat" cellspacing="0">
+		<thead>
+		<tr>
+			<th colspan="3" data-export-label="Post Type Counts"><h2><?php esc_html_e( 'Post Type Counts', 'classic-commerce' ); ?></h2></th>
+		</tr>
+		</thead>
+		<tbody>
 		<?php
 		foreach ( $post_type_counts as $post_type ) {
 			?>
@@ -516,9 +527,8 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 				<td class="help">&nbsp;</td>
 				<td><?php echo absint( $post_type->count ); ?></td>
 			</tr>
-			<?php
-		}
-		?>
+            <?php } ?>
+            <?php endif; ?>
 	</tbody>
 </table>
 <table class="wc_status_table widefat" cellspacing="0">
@@ -551,7 +561,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 				<?php if ( $security['hide_errors'] ) : ?>
 					<mark class="yes"><span class="dashicons dashicons-yes"></span></mark>
 				<?php else : ?>
-					<mark class="error"><span class="dashicons dashicons-warning"></span> <?php esc_html_e( 'Error messages should not be shown to visitors.', 'classic-commerce' ); ?></mark>
+					<mark class="error"><span class="dashicons dashicons-warning"></span><?php esc_html_e( 'Error messages should not be shown to visitors.', 'classic-commerce' ); ?></mark>
 				<?php endif; ?>
 			</td>
 		</tr>
@@ -565,14 +575,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 	</thead>
 	<tbody>
 		<?php
-		foreach ( $active_plugins as $plugin ) {
-
-			$plugin_path = WP_PLUGIN_DIR . '/' . $plugin['plugin'];
-
-			$plugin_details = get_file_data( $plugin_path, array(
-						'WC requires at least' => 'WC requires at least'
-					) );
-
+		foreach ( $active_plugins as $plugin ) { // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 			if ( ! empty( $plugin['name'] ) ) {
 				$dirname = dirname( $plugin['plugin'] );
 
@@ -598,13 +601,6 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 				if ( array_key_exists( $plugin['plugin'], $untested_plugins ) ) {
 					$untested_string = ' &ndash; <strong style="color:red;">' . esc_html__( 'Not tested with the active version of Classic Commerce', 'classic-commerce' ) . '</strong>';
 				}
-				$WC_requires = '';
-				if ( $plugin_details['WC requires at least'] !== '' ) {
-					$WC_requires = ' &ndash; <mark class="yes"><span class="dashicons dashicons-yes"></span>' . esc_html__( 'Requires at least WC ' . $plugin_details['WC requires at least'], 'classic-commerce' ) . '</mark>';
-					if (version_compare($plugin_details['WC requires at least'], '3.5.3', '>')) {
-						$WC_requires = ' &ndash; <mark class="error"><span class="dashicons dashicons-warning"></span> ' . esc_html__( 'Requires at least WC ', 'classic-commerce' ) . $plugin_details['WC requires at least'] . ' &ndash; ' . wp_kses_post( sprintf( __( '<a href="%s" target="_blank" rel="noreferrer noopenner">Learn more</a>.', 'classic-commerce' ), 'https://classiccommerce.cc/docs/using-woocommerce-plugins-with-classic-commerce/' ) ) . '</mark>';
-					}
-				}
 				?>
 				<tr>
 					<td><?php echo wp_kses_post( $plugin_name ); ?></td>
@@ -613,7 +609,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 					<?php
 						/* translators: %s: plugin author */
 						printf( esc_html__( 'by %s', 'classic-commerce' ), esc_html( $plugin['author_name'] ) );
-						echo ' &ndash; ' . esc_html( $plugin['version'] ) . $version_string . $untested_string . $network_string . $WC_requires; // WPCS: XSS ok.
+						echo ' &ndash; ' . esc_html( $plugin['version'] ) . $version_string . $untested_string . $network_string; // WPCS: XSS ok.
 					?>
 					</td>
 				</tr>
@@ -626,13 +622,122 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 <table class="wc_status_table widefat" cellspacing="0">
 	<thead>
 		<tr>
+			<th colspan="3" data-export-label="Inactive Plugins (<?php echo count( $inactive_plugins ); ?>)"><h2><?php esc_html_e( 'Inactive plugins', 'classic-commerce' ); ?> (<?php echo count( $inactive_plugins ); ?>)</h2></th>
+		</tr>
+	</thead>
+	<tbody>
+		<?php
+		foreach ( $inactive_plugins as $plugin ) { // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+			if ( ! empty( $plugin['name'] ) ) {
+				$dirname = dirname( $plugin['plugin'] );
+
+				// Link the plugin name to the plugin url if available.
+				$plugin_name = esc_html( $plugin['name'] );
+				if ( ! empty( $plugin['url'] ) ) {
+					$plugin_name = '<a href="' . esc_url( $plugin['url'] ) . '" aria-label="' . esc_attr__( 'Visit plugin homepage', 'classic-commerce' ) . '" target="_blank">' . $plugin_name . '</a>';
+				}
+
+				$version_string = '';
+				$network_string = '';
+				if ( strstr( $plugin['url'], 'woothemes.com' ) || strstr( $plugin['url'], 'woocommerce.com' ) ) {
+					if ( ! empty( $plugin['version_latest'] ) && version_compare( $plugin['version_latest'], $plugin['version'], '>' ) ) {
+						/* translators: %s: plugin latest version */
+						$version_string = ' &ndash; <strong style="color:red;">' . sprintf( esc_html__( '%s is available', 'classic-commerce' ), $plugin['version_latest'] ) . '</strong>';
+					}
+
+					if ( false !== $plugin['network_activated'] ) {
+						$network_string = ' &ndash; <strong style="color:black;">' . esc_html__( 'Network enabled', 'classic-commerce' ) . '</strong>';
+					}
+				}
+				$untested_string = '';
+				if ( array_key_exists( $plugin['plugin'], $untested_plugins ) ) {
+					$untested_string = ' &ndash; <strong style="color:red;">' . esc_html__( 'Not tested with the active version of Classic Commerce', 'classic-commerce' ) . '</strong>';
+				}
+				?>
+				<tr>
+					<td><?php echo wp_kses_post( $plugin_name ); ?></td>
+					<td class="help">&nbsp;</td>
+					<td>
+					<?php
+						/* translators: %s: plugin author */
+						printf( esc_html__( 'by %s', 'classic-commerce' ), esc_html( $plugin['author_name'] ) );
+						echo ' &ndash; ' . esc_html( $plugin['version'] ) . $version_string . $untested_string . $network_string; // WPCS: XSS ok.
+					?>
+					</td>
+				</tr>
+				<?php
+			}
+		}
+		?>
+	</tbody>
+</table>
+<?php
+if ( 0 < count( $dropins_mu_plugins['dropins'] ) ) :
+	?>
+	<table class="wc_status_table widefat" cellspacing="0">
+		<thead>
+			<tr>
+				<th colspan="3" data-export-label="Dropin Plugins (<?php echo count( $dropins_mu_plugins['dropins'] ); ?>)"><h2><?php esc_html_e( 'Dropin Plugins', 'classic-commerce' ); ?> (<?php echo count( $dropins_mu_plugins['dropins'] ); ?>)</h2></th>
+			</tr>
+		</thead>
+		<tbody>
+			<?php
+			foreach ( $dropins_mu_plugins['dropins'] as $dropin ) {
+				?>
+				<tr>
+					<td><?php echo wp_kses_post( $dropin['plugin'] ); ?></td>
+					<td class="help">&nbsp;</td>
+					<td><?php echo wp_kses_post( $dropin['name'] ); ?>
+				</tr>
+				<?php
+			}
+			?>
+		</tbody>
+	</table>
+	<?php
+endif;
+if ( 0 < count( $dropins_mu_plugins['mu_plugins'] ) ) :
+	?>
+	<table class="wc_status_table widefat" cellspacing="0">
+		<thead>
+			<tr>
+				<th colspan="3" data-export-label="Must Use Plugins (<?php echo count( $dropins_mu_plugins['mu_plugins'] ); ?>)"><h2><?php esc_html_e( 'Must Use Plugins', 'classic-commerce' ); ?> (<?php echo count( $dropins_mu_plugins['mu_plugins'] ); ?>)</h2></th>
+			</tr>
+		</thead>
+		<tbody>
+			<?php
+			foreach ( $dropins_mu_plugins['mu_plugins'] as $mu_plugin ) { // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+				$plugin_name = esc_html( $mu_plugin['name'] );
+				if ( ! empty( $mu_plugin['url'] ) ) {
+					$plugin_name = '<a href="' . esc_url( $mu_plugin['url'] ) . '" aria-label="' . esc_attr__( 'Visit plugin homepage', 'classic-commerce' ) . '" target="_blank">' . $plugin_name . '</a>';
+				}
+				?>
+				<tr>
+					<td><?php echo wp_kses_post( $plugin_name ); ?></td>
+					<td class="help">&nbsp;</td>
+					<td>
+					<?php
+						/* translators: %s: plugin author */
+						printf( esc_html__( 'by %s', 'classic-commerce' ), esc_html( $mu_plugin['author_name'] ) );
+						echo ' &ndash; ' . esc_html( $mu_plugin['version'] );
+					?>
+				</tr>
+				<?php
+			}
+			?>
+		</tbody>
+	</table>
+<?php endif; ?>
+<table class="wc_status_table widefat" cellspacing="0">
+	<thead>
+		<tr>
 			<th colspan="3" data-export-label="Settings"><h2><?php esc_html_e( 'Settings', 'classic-commerce' ); ?></h2></th>
 		</tr>
 	</thead>
 	<tbody>
 		<tr>
-			<td data-export-label="API Enabled"><?php esc_html_e( 'API enabled', 'classic-commerce' ); ?>:</td>
-			<td class="help"><?php echo wc_help_tip( esc_html__( 'Does your site have REST API enabled?', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
+			<td data-export-label="Legacy API Enabled"><?php esc_html_e( 'Legacy API enabled', 'classic-commerce' ); ?>:</td>
+			<td class="help"><?php echo wc_help_tip( esc_html__( 'Does your site have the Legacy REST API enabled?', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td><?php echo $settings['api_enabled'] ? '<mark class="yes"><span class="dashicons dashicons-yes"></span></mark>' : '<mark class="no">&ndash;</mark>'; ?></td>
 		</tr>
 		<tr>
@@ -666,7 +771,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			<td><?php echo esc_html( $settings['number_of_decimals'] ); ?></td>
 		</tr>
 		<tr>
-			<td data-export-label="Taxonomies: Product Types"><?php esc_html_e( 'Taxonomies: Product types', 'classic-commerce' ); ?></th>
+			<td data-export-label="Taxonomies: Product Types"><?php esc_html_e( 'Taxonomies: Product types', 'classic-commerce' ); ?></td>
 			<td class="help"><?php echo wc_help_tip( esc_html__( 'A list of taxonomy terms that can be used in regard to order/product statuses.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td>
 				<?php
@@ -679,7 +784,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			</td>
 		</tr>
 		<tr>
-			<td data-export-label="Taxonomies: Product Visibility"><?php esc_html_e( 'Taxonomies: Product visibility', 'classic-commerce' ); ?></th>
+			<td data-export-label="Taxonomies: Product Visibility"><?php esc_html_e( 'Taxonomies: Product visibility', 'classic-commerce' ); ?></td>
 			<td class="help"><?php echo wc_help_tip( esc_html__( 'A list of taxonomy terms used for product visibility.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
 			<td>
 				<?php
@@ -702,14 +807,14 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 	<tbody>
 		<?php
 		$alt = 1;
-		foreach ( $pages as $page ) {
-			$error = false;
+		foreach ( $wp_pages as $_page ) {
+			$found_error = false;
 
-			if ( $page['page_id'] ) {
+			if ( $_page['page_id'] ) {
 				/* Translators: %s: page name. */
-				$page_name = '<a href="' . get_edit_post_link( $page['page_id'] ) . '" aria-label="' . sprintf( esc_html__( 'Edit %s page', 'classic-commerce' ), esc_html( $page['page_name'] ) ) . '">' . esc_html( $page['page_name'] ) . '</a>';
+				$page_name = '<a href="' . get_edit_post_link( $_page['page_id'] ) . '" aria-label="' . sprintf( esc_html__( 'Edit %s page', 'classic-commerce' ), esc_html( $_page['page_name'] ) ) . '">' . esc_html( $_page['page_name'] ) . '</a>';
 			} else {
-				$page_name = esc_html( $page['page_name'] );
+				$page_name = esc_html( $_page['page_name'] );
 			}
 
 			echo '<tr><td data-export-label="' . esc_attr( $page_name ) . '">' . wp_kses_post( $page_name ) . ':</td>';
@@ -717,28 +822,28 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			echo '<td class="help">' . wc_help_tip( sprintf( esc_html__( 'The URL of your %s page (along with the Page ID).', 'classic-commerce' ), $page_name ) ) . '</td><td>';
 
 			// Page ID check.
-			if ( ! $page['page_set'] ) {
+			if ( ! $_page['page_set'] ) {
 				echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . esc_html__( 'Page not set', 'classic-commerce' ) . '</mark>';
-				$error = true;
-			} elseif ( ! $page['page_exists'] ) {
+				$found_error = true;
+			} elseif ( ! $_page['page_exists'] ) {
 				echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . esc_html__( 'Page ID is set, but the page does not exist', 'classic-commerce' ) . '</mark>';
-				$error = true;
-			} elseif ( ! $page['page_visible'] ) {
+				$found_error = true;
+			} elseif ( ! $_page['page_visible'] ) {
 				/* Translators: %s: docs link. */
-				echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . wp_kses_post( sprintf( __( 'Page visibility should be <a href="%s" target="_blank">public</a>', 'classic-commerce' ), 'https://codex.wordpress.org/Content_Visibility' ) ) . '</mark>';
-				$error = true;
+				echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . wp_kses_post( sprintf( __( 'Page visibility should be <a href="%s" target="_blank">public</a>', 'classic-commerce' ), 'https://wordpress.org/support/article/content-visibility/' ) ) . '</mark>';
+				$found_error = true;
 			} else {
 				// Shortcode check.
-				if ( $page['shortcode_required'] ) {
-					if ( ! $page['shortcode_present'] ) {
-						echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . sprintf( esc_html__( 'Page does not contain the shortcode.', 'classic-commerce' ), esc_html( $page['shortcode'] ) ) . '</mark>';
-						$error = true;
+				if ( $_page['shortcode_required'] ) {
+					if ( ! $_page['shortcode_present'] ) {
+						echo '<mark class="error"><span class="dashicons dashicons-warning"></span> ' . sprintf( esc_html__( 'Page does not contain the shortcode.', 'classic-commerce' ), esc_html( $_page['shortcode'] ) ) . '</mark>';
+						$found_error = true;
 					}
 				}
 			}
 
-			if ( ! $error ) {
-				echo '<mark class="yes">#' . absint( $page['page_id'] ) . ' - ' . esc_html( str_replace( home_url(), '', get_permalink( $page['page_id'] ) ) ) . '</mark>';
+			if ( ! $found_error ) {
+				echo '<mark class="yes">#' . absint( $_page['page_id'] ) . ' - ' . esc_html( str_replace( home_url(), '', get_permalink( $_page['page_id'] ) ) ) . '</mark>';
 			}
 
 			echo '</td></tr>';
@@ -761,15 +866,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 		<tr>
 			<td data-export-label="Version"><?php esc_html_e( 'Version', 'classic-commerce' ); ?>:</td>
 			<td class="help"><?php echo wc_help_tip( esc_html__( 'The installed version of the current active theme.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
-			<td>
-				<?php
-				echo esc_html( $theme['version'] );
-				if ( version_compare( $theme['version'], $theme['version_latest'], '<' ) ) {
-					/* translators: %s: theme latest version */
-					echo ' &ndash; <strong style="color:red;">' . sprintf( esc_html__( '%s is available', 'classic-commerce' ), esc_html( $theme['version_latest'] ) ) . '</strong>';
-				}
-				?>
-			</td>
+			<td><?php echo esc_html( $theme['version'] ); ?></td>
 		</tr>
 		<tr>
 			<td data-export-label="Author URL"><?php esc_html_e( 'Author URL', 'classic-commerce' ); ?>:</td>
@@ -785,7 +882,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 					echo '<mark class="yes"><span class="dashicons dashicons-yes"></span></mark>';
 				} else {
 					/* Translators: %s docs link. */
-					echo '<span class="dashicons dashicons-no-alt"></span> &ndash; ' . wp_kses_post( sprintf( __( 'If you are modifying Classic Commerce on a parent theme that you did not build personally we recommend using a child theme. See: <a href="%s" target="_blank">How to create a child theme</a>', 'classic-commerce' ), 'https://codex.wordpress.org/Child_Themes' ) );
+					echo '<span class="dashicons dashicons-no-alt"></span> &ndash; ' . wp_kses_post( sprintf( __( 'If you are modifying Classic Commerce on a parent theme that you did not build personally we recommend using a child theme. See: <a href="%s" target="_blank">How to create a child theme</a>', 'classic-commerce' ), 'https://developer.wordpress.org/themes/advanced-topics/child-themes/' ) );
 				}
 				?>
 				</td>
@@ -799,15 +896,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 			<tr>
 				<td data-export-label="Parent Theme Version"><?php esc_html_e( 'Parent theme version', 'classic-commerce' ); ?>:</td>
 				<td class="help"><?php echo wc_help_tip( esc_html__( 'The installed version of the parent theme.', 'classic-commerce' ) ); /* phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped */ ?></td>
-				<td>
-					<?php
-					echo esc_html( $theme['parent_version'] );
-					if ( version_compare( $theme['parent_version'], $theme['parent_version_latest'], '<' ) ) {
-						/* translators: %s: parent theme latest version */
-						echo ' &ndash; <strong style="color:red;">' . sprintf( esc_html__( '%s is available', 'classic-commerce' ), esc_html( $theme['parent_version_latest'] ) ) . '</strong>';
-					}
-					?>
-				</td>
+				<td><?php echo esc_html( $theme['parent_version'] ); ?></td>
 			</tr>
 			<tr>
 				<td data-export-label="Parent Theme Author URL"><?php esc_html_e( 'Parent theme author URL', 'classic-commerce' ); ?>:</td>
@@ -841,7 +930,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 		<tr>
 			<td data-export-label="Archive Template"><?php esc_html_e( 'Archive template', 'classic-commerce' ); ?>:</td>
 			<td class="help">&nbsp;</td>
-			<td><?php esc_html_e( 'Your theme has a woocommerce.php file, you will not be able to override the woocommerce/archive-product.php custom template since woocommerce.php has priority over archive-product.php. This is intended to prevent display issues.', 'classic-commerce' ); ?></td>
+			<td><?php esc_html_e( 'Your theme has a classic-commerce.php file, you will not be able to override the classic-commerce/archive-product.php custom template since classic-commerce.php has priority over archive-product.php. This is intended to prevent display issues.', 'classic-commerce' ); ?></td>
 		</tr>
 		<?php endif ?>
 		<?php if ( ! empty( $theme['overrides'] ) ) : ?>
@@ -853,18 +942,9 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 					$total_overrides = count( $theme['overrides'] );
 					for ( $i = 0; $i < $total_overrides; $i++ ) {
 						$override = $theme['overrides'][ $i ];
-						if ( $override['core_version'] && ( empty( $override['version'] ) || version_compare( $override['version'], $override['core_version'], '<' ) ) ) {
-							$current_version = $override['version'] ? $override['version'] : '-';
-							printf(
-								/* Translators: %1$s: Template name, %2$s: Template version, %3$s: Core version. */
-								esc_html__( '%1$s version %2$s is out of date. The core version is %3$s', 'classic-commerce' ),
-								'<code>' . esc_html( $override['file'] ) . '</code>',
-								'<strong style="color:red">' . esc_html( $current_version ) . '</strong>',
-								esc_html( $override['core_version'] )
-							);
-						} else {
-							echo esc_html( $override['file'] );
-						}
+						
+                        echo esc_html( $override['file'] );
+						
 						if ( ( count( $theme['overrides'] ) - 1 ) !== $i ) {
 							echo ', ';
 						}
@@ -880,8 +960,7 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 				<td>&ndash;</td>
 			</tr>
 		<?php endif; ?>
-
-		<?php if ( true === $theme['has_outdated_templates'] ) : ?>
+        <?php if ( true === $theme['has_outdated_templates'] ) : ?>
 			<tr>
 				<td data-export-label="Outdated Templates"><?php esc_html_e( 'Outdated templates', 'classic-commerce' ); ?>:</td>
 				<td class="help">&nbsp;</td>
@@ -889,8 +968,14 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 					<mark class="error">
 						<span class="dashicons dashicons-warning"></span>
 					</mark>
-					<a href="https://classiccommerce.cc/usage-and-maintenance/fix-outdated-templates/" target="_blank">
+					<a href="https://classiccommerce.cc/docs/usage-and-maintenance/fix-outdated-templates/" target="_blank">
 						<?php esc_html_e( 'Learn how to update', 'classic-commerce' ); ?>
+					</a> |
+					<mark class="info">
+						<span class="dashicons dashicons-info"></span>
+					</mark>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-status&tab=tools' ) ); ?>">
+						<?php esc_html_e( 'Clear system status theme info cache', 'classic-commerce' ); ?>
 					</a>
 				</td>
 			</tr>
@@ -899,3 +984,19 @@ $untested_plugins = $plugin_updates->get_untested_plugins( WC()->version, 'minor
 </table>
 
 <?php do_action( 'woocommerce_system_status_report' ); ?>
+
+<table class="wc_status_table widefat" cellspacing="0">
+	<thead>
+	<tr>
+		<th colspan="3" data-export-label="Status report information"><h2><?php esc_html_e( 'Status report information', 'classic-commerce' ); ?><?php echo wc_help_tip( esc_html__( 'This section shows information about this status report.', 'classic-commerce' ) ); ?></h2></th>
+	</tr>
+	</thead>
+	<tbody>
+	<tr>
+		<td data-export-label="Generated at"><?php esc_html_e( 'Generated at', 'classic-commerce' ); ?>:</td>
+		<td class="help">&nbsp;</td>
+		<td><?php echo esc_html( current_time( 'Y-m-d H:i:s P' ) ); ?></td>
+
+	</tr>
+	</tbody>
+</table>

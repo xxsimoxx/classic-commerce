@@ -9,8 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Legacy and deprecated functions are here to keep the WC_Abstract_Order clean.
  * This class will be removed in future versions.
  *
- * @version	 WC-3.0.0
- * @package	 ClassicCommerce/Abstracts
+ * @version	 3.0.0
+ * @package	 WooCommerce\Abstracts
  * @category	Abstract Class
  * @author	  WooThemes
  */
@@ -283,7 +283,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 	 * Update tax line on order.
 	 * Note this does not update order totals.
 	 *
-	 * @since WC-3.0
+	 * @since 3.0
 	 * @param object|int $item
 	 * @param array $args
 	 * @return int updated order item ID
@@ -312,11 +312,12 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Get a product (either product or variation).
-	 * @deprecated Add deprecation notices in future release. Replaced with $item->get_product()
+	 * @deprecated 4.4.0
 	 * @param object $item
 	 * @return WC_Product|bool
 	 */
 	public function get_product_from_item( $item ) {
+		wc_deprecated_function( 'WC_Abstract_Legacy_Order::get_product_from_item', '4.4.0', '$item->get_product()' );
 		if ( is_callable( array( $item, 'get_product' ) ) ) {
 			$product = $item->get_product();
 		} else {
@@ -461,7 +462,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 	 * has_meta function for order items. This is different to the WC_Data
 	 * version and should be removed in future versions.
 	 *
-	 * @deprecated
+	 * @deprecated 3.0
 	 *
 	 * @param int $order_item_id
 	 *
@@ -505,7 +506,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 				$i++;
 				/* translators: 1: current item count */
 				$prefix  = count( $download_files ) > 1 ? sprintf( __( 'Download %d', 'classic-commerce' ), $i ) : __( 'Download', 'classic-commerce' );
-				$links[] = '<small class="download-url">' . $prefix . ': <a href="' . esc_url( $file['download_url'] ) . '" target="_blank">' . esc_html( $file['name'] ) . '</a></small>' . "\n";
+				$links[] = '<small class="download-url">' . esc_html( $prefix ) . ': <a href="' . esc_url( $file['download_url'] ) . '" target="_blank">' . esc_html( $file['name'] ) . '</a></small>' . "\n";
 			}
 
 			echo '<br/>' . implode( '<br/>', $links );
@@ -559,8 +560,8 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Gets shipping total. Alias of WC_Order::get_shipping_total().
-	 * @deprecated WC-3.0.0 since this is an alias only.
-	 * @return     float
+	 * @deprecated 3.0.0 since this is an alias only.
+	 * @return float
 	 */
 	public function get_total_shipping() {
 		return $this->get_shipping_total();
@@ -568,11 +569,11 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Get order item meta.
-	 * @deprecated WC-3.0.0
-	 * @param      mixed $order_item_id
-	 * @param      string $key (default: '')
-	 * @param      bool $single (default: false)
-	 * @return     array|string
+	 * @deprecated 3.0.0
+	 * @param mixed $order_item_id
+	 * @param string $key (default: '')
+	 * @param bool $single (default: false)
+	 * @return array|string
 	 */
 	public function get_item_meta( $order_item_id, $key = '', $single = false ) {
 		wc_deprecated_function( 'WC_Order::get_item_meta', '3.0', 'wc_get_order_item_meta' );
@@ -599,8 +600,19 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 	}
 
 	/**
+	 * Get coupon codes only.
+	 *
+	 * @deprecated 3.7.0 - Replaced with better named method to reflect the actual data being returned.
+	 * @return array
+	 */
+	public function get_used_coupons() {
+		wc_deprecated_function( 'get_used_coupons', '3.7', 'WC_Abstract_Order::get_coupon_codes' );
+		return $this->get_coupon_codes();
+	}
+
+	/**
 	 * Expand item meta into the $item array.
-	 * @deprecated WC-3.0.0 Item meta no longer expanded due to new order item
+	 * @deprecated 3.0.0 Item meta no longer expanded due to new order item
 	 *		classes. This function now does nothing to avoid data breakage.
 	 * @param array $item before expansion.
 	 * @return array
@@ -612,7 +624,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Load the order object. Called from the constructor.
-	 * @deprecated WC-3.0.0 Logic moved to constructor
+	 * @deprecated 3.0.0 Logic moved to constructor
 	 * @param int|object|WC_Order $order Order to init.
 	 */
 	protected function init( $order ) {
@@ -630,9 +642,9 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Gets an order from the database.
-	 * @deprecated WC-3.0
-	 * @param      int $id (default: 0).
-	 * @return     bool
+	 * @deprecated 3.0
+	 * @param int $id (default: 0).
+	 * @return bool
 	 */
 	public function get_order( $id = 0 ) {
 		wc_deprecated_function( 'WC_Order::get_order', '3.0' );
@@ -653,8 +665,8 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Populates an order from the loaded post data.
-	 * @deprecated WC-3.0
-	 * @param      mixed $result
+	 * @deprecated 3.0
+	 * @param mixed $result
 	 */
 	public function populate( $result ) {
 		wc_deprecated_function( 'WC_Order::populate', '3.0' );
@@ -665,8 +677,8 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Cancel the order and restore the cart (before payment).
-	 * @deprecated WC-3.0.0 Moved to event handler.
-	 * @param      string $note (default: '') Optional note to add.
+	 * @deprecated 3.0.0 Moved to event handler.
+	 * @param string $note (default: '') Optional note to add.
 	 */
 	public function cancel_order( $note = '' ) {
 		wc_deprecated_function( 'WC_Order::cancel_order', '3.0', 'WC_Order::update_status' );
@@ -676,7 +688,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Record sales.
-	 * @deprecated WC-3.0.0
+	 * @deprecated 3.0.0
 	 */
 	public function record_product_sales() {
 		wc_deprecated_function( 'WC_Order::record_product_sales', '3.0', 'wc_update_total_sales_counts' );
@@ -685,7 +697,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Increase applied coupon counts.
-	 * @deprecated WC-3.0.0
+	 * @deprecated 3.0.0
 	 */
 	public function increase_coupon_usage_counts() {
 		wc_deprecated_function( 'WC_Order::increase_coupon_usage_counts', '3.0', 'wc_update_coupon_usage_counts' );
@@ -694,7 +706,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Decrease applied coupon counts.
-	 * @deprecated WC-3.0.0
+	 * @deprecated 3.0.0
 	 */
 	public function decrease_coupon_usage_counts() {
 		wc_deprecated_function( 'WC_Order::decrease_coupon_usage_counts', '3.0', 'wc_update_coupon_usage_counts' );
@@ -703,7 +715,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Reduce stock levels for all line items in the order.
-	 * @deprecated WC-3.0.0
+	 * @deprecated 3.0.0
 	 */
 	public function reduce_order_stock() {
 		wc_deprecated_function( 'WC_Order::reduce_order_stock', '3.0', 'wc_reduce_stock_levels' );
@@ -712,7 +724,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Send the stock notifications.
-	 * @deprecated WC-3.0.0 No longer needs to be called directly.
+	 * @deprecated 3.0.0 No longer needs to be called directly.
 	 *
 	 * @param $product
 	 * @param $new_stock
@@ -724,9 +736,9 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Output items for display in html emails.
-	 * @deprecated WC-3.0.0 Moved to template functions.
-	 * @param      array $args Items args.
-	 * @return     string
+	 * @deprecated 3.0.0 Moved to template functions.
+	 * @param array $args Items args.
+	 * @return string
 	 */
 	public function email_order_items_table( $args = array() ) {
 		wc_deprecated_function( 'WC_Order::email_order_items_table', '3.0', 'wc_get_email_order_items' );
@@ -735,7 +747,7 @@ abstract class WC_Abstract_Legacy_Order extends WC_Data {
 
 	/**
 	 * Get currency.
-	 * @deprecated WC-3.0.0
+	 * @deprecated 3.0.0
 	 */
 	public function get_order_currency() {
 		wc_deprecated_function( 'WC_Order::get_order_currency', '3.0', 'WC_Order::get_currency' );

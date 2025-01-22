@@ -50,7 +50,7 @@ class WC_Report_Customer_List extends WP_List_Table {
 		if ( ! empty( $_GET['link_orders'] ) && wp_verify_nonce( $_REQUEST['_wpnonce'], 'link_orders' ) ) {
 			$linked = wc_update_new_customer_past_orders( absint( $_GET['link_orders'] ) );
 
-			echo '<div class="updated"><p>' . sprintf( _n( '%s previous order linked', '%s previous orders linked', $linked, 'classic-commerce' ), $linked ) . '</p></div>';
+			echo '<div class="updated"><p>' . esc_html( sprintf( _n( '%s previous order linked', '%s previous orders linked', $linked, 'classic-commerce' ), $linked ) ) . '</p></div>';
 		}
 
 		if ( ! empty( $_GET['refresh'] ) && wp_verify_nonce( $_REQUEST['_wpnonce'], 'refresh' ) ) {
@@ -59,6 +59,7 @@ class WC_Report_Customer_List extends WP_List_Table {
 
 			delete_user_meta( $user_id, '_money_spent' );
 			delete_user_meta( $user_id, '_order_count' );
+            delete_user_meta( $user_id, '_last_order' );
 
 			echo '<div class="updated"><p>' . sprintf( __( 'Refreshed stats for %s', 'classic-commerce' ), $user->display_name ) . '</p></div>';
 		}

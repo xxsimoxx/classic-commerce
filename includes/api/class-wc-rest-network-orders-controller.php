@@ -4,8 +4,8 @@
  *
  * Handles requests to the /orders/network endpoint
  *
- * @package ClassicCommerce/API
- * @since   WC-3.4.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.4.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Network Orders controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Network_Orders_V2_Controller
  */
 class WC_REST_Network_Orders_Controller extends WC_REST_Network_Orders_V2_Controller {

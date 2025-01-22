@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php _e( 'Shipping zones', 'classic-commerce' ); ?>
 	<a href="<?php echo admin_url( 'admin.php?page=wc-settings&tab=shipping&zone_id=new' ); ?>" class="page-title-action"><?php esc_html_e( 'Add shipping zone', 'classic-commerce' ); ?></a>
 </h2>
-<p><?php echo __( 'A shipping zone is a geographic region where a certain set of shipping methods are offered.', 'classic-commerce' ) . ' ' . __( 'Classic Commerce will match a customer to a single zone using their shipping address and present the shipping methods within that zone to them.', 'classic-commerce' ); ?></p>
+<p class="wc-shipping-zone-heading-help-text"><?php echo esc_html_e( 'A shipping zone consists of the region(s) you\'d like to ship to and the shipping method(s) offered. A shopper can only be matched to one zone, and we\'ll use their shipping address to show them the methods available in their area.', 'classic-commerce' ); ?></p>
 <table class="wc-shipping-zones widefat">
 	<thead>
 		<tr>
@@ -25,10 +25,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<td class="wc-shipping-zone-name">
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=shipping&zone_id=0' ) ); ?>"><?php esc_html_e( 'Locations not covered by your other zones', 'classic-commerce' ); ?></a>
 				<div class="row-actions">
-					<a href="admin.php?page=wc-settings&amp;tab=shipping&amp;zone_id=0"><?php _e( 'Manage shipping methods', 'classic-commerce' ); ?></a>
+					<a href="admin.php?page=wc-settings&amp;tab=shipping&amp;zone_id=0"><?php esc_html_e( 'Manage shipping methods', 'classic-commerce' ); ?></a>
 				</div>
 			</td>
-			<td class="wc-shipping-zone-region"><?php _e( 'This zone is <b>optionally</b> used for regions that are not included in any other shipping zone.', 'classic-commerce' ); ?></td>
+			<td class="wc-shipping-zone-region"><?php esc_html_e( 'This zone is <b>optionally</b> used for regions that are not included in any other shipping zone.', 'classic-commerce' ); ?></td>
 			<td class="wc-shipping-zone-methods">
 				<ul>
 					<?php
@@ -55,14 +55,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php if ( 0 === $method_count ) : ?>
 		<tr>
 			<td class="wc-shipping-zones-blank-state" colspan="4">
-				<p class="main"><?php _e( 'A shipping zone is a geographic region where a certain set of shipping methods and rates apply.', 'classic-commerce' ); ?></p>
-				<p><?php _e( 'For example:', 'classic-commerce' ); ?></p>
+				<p class="main"><?php esc_html_e( 'A shipping zone is a geographic region where a certain set of shipping methods and rates apply.', 'classic-commerce' ); ?></p>
+				<p><?php esc_html_e( 'For example:', 'classic-commerce' ); ?></p>
 				<ul>
-					<li><?php _e( 'Local zone = California ZIP 90210 = Local pickup', 'classic-commerce' ); ?>
-					<li><?php _e( 'US domestic zone = All US states = Flat rate shipping', 'classic-commerce' ); ?>
-					<li><?php _e( 'Europe zone = Any country in Europe = Flat rate shipping', 'classic-commerce' ); ?>
+					<li><?php esc_html_e( 'Local zone = California ZIP 90210 = Local pickup', 'classic-commerce' ); ?>
+					<li><?php esc_html_e( 'US domestic zone = All US states = Flat rate shipping', 'classic-commerce' ); ?>
+					<li><?php esc_html_e( 'Europe zone = Any country in Europe = Flat rate shipping', 'classic-commerce' ); ?>
 				</ul>
-				<p><?php _e( 'Add as many zones as you need &ndash; customers will only see the methods available for their address.', 'classic-commerce' ); ?></p>
+				<p><?php esc_html_e( 'Add as many zones as you need &ndash; customers will only see the methods available for their address.', 'classic-commerce' ); ?></p>
 				<a class="button button-primary wc-shipping-zone-add" href="<?php echo esc_url( admin_url( 'admin.php?page=wc-settings&tab=shipping&zone_id=new' ) ); ?>"><?php _e( 'Add shipping zone', 'classic-commerce' ); ?></a>
 			</td>
 		</tr>
@@ -104,11 +104,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 							<select name="add_method_id">
 								<?php
-								foreach ( WC()->shipping->load_shipping_methods() as $method ) {
+								foreach ( WC()->shipping()->load_shipping_methods() as $method ) {
 									if ( ! $method->supports( 'shipping-zones' ) ) {
 										continue;
 									}
-									echo '<option data-description="' . esc_attr( wp_kses_post( wpautop( $method->get_method_description() ) ) ) . '" value="' . esc_attr( $method->id ) . '">' . esc_attr( $method->get_method_title() ) . '</li>';
+									echo '<option data-description="' . esc_attr( wp_kses_post( wpautop( $method->get_method_description() ) ) ) . '" value="' . esc_attr( $method->id ) . '">' . esc_html( $method->get_method_title() ) . '</li>';
 								}
 								?>
 							</select>

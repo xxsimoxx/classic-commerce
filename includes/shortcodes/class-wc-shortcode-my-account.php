@@ -39,66 +39,53 @@ class WC_Shortcode_My_Account {
 			return;
 		}
 
+        self::my_account_add_notices();
+
+		// Show the lost password page. This can still be accessed directly by logged in accounts which is important for the initial create password links sent via email.
+		if ( isset( $wp->query_vars['lost-password'] ) ) {
+			self::lost_password();
+			return;
+		}
+
+		// Show login form if not logged in.
 		if ( ! is_user_logged_in() ) {
+			wc_get_template( 'myaccount/form-login.php' );
+			return;
+		}
+
+		// Output the my account page.
+		self::my_account( $atts );
+	}
+
+	/**
+	 * Add notices to the my account page.
+	 *
+	 * Historically a filter has existed to render a message above the my account page content while the user is
+	 * logged out. See `woocommerce_my_account_message`.
+	 */
+	private static function my_account_add_notices() {
+        if ( ! is_user_logged_in() ) {
+			/**
+			 * Filters the message shown on the 'my account' page when the user is not logged in.
+			 *
+			 * @since 2.6.0
+			 */
 			$message = apply_filters( 'woocommerce_my_account_message', '' );
 
 			if ( ! empty( $message ) ) {
 				wc_add_notice( $message );
 			}
+        }
 
-			// After password reset, add confirmation message.
-			if ( ! empty( $_GET['password-reset'] ) ) { // WPCS: input var ok, CSRF ok.
-				wc_add_notice( __( 'Your password has been reset successfully.', 'classic-commerce' ) );
-			}
+        // After password reset, add confirmation message.
+		if ( ! empty( $_GET['password-reset'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			wc_add_notice( __( 'Your password has been reset successfully.', 'classic-commerce' ) );
+		}
 
-			if ( isset( $wp->query_vars['lost-password'] ) ) {
-				self::lost_password();
-			} else {
-				wc_get_template( 'myaccount/form-login.php' );
-			}
-		} else {
-			// Start output buffer since the html may need discarding for BW compatibility.
-			ob_start();
-
-			if ( isset( $wp->query_vars['customer-logout'] ) ) {
-				/* translators: %s: logout url */
-				wc_add_notice( sprintf( __( 'Are you sure you want to log out? <a href="%s">Confirm and log out</a>', 'classic-commerce' ), wc_logout_url() ) );
-			}
-
-			// Collect notices before output.
-			$notices = wc_get_notices();
-
-			// Output the new account page.
-			self::my_account( $atts );
-
-			/**
-			 * Deprecated my-account.php template handling. This code should be
-			 * removed in a future release.
-			 *
-			 * If woocommerce_account_content did not run, this is an old template
-			 * so we need to render the endpoint content again.
-			 */
-			if ( ! did_action( 'woocommerce_account_content' ) ) {
-				if ( ! empty( $wp->query_vars ) ) {
-					foreach ( $wp->query_vars as $key => $value ) {
-						if ( 'pagename' === $key ) {
-							continue;
-						}
-						if ( has_action( 'woocommerce_account_' . $key . '_endpoint' ) ) {
-							ob_clean(); // Clear previous buffer.
-							wc_set_notices( $notices );
-							wc_print_notices();
-							do_action( 'woocommerce_account_' . $key . '_endpoint', $value );
-							break;
-						}
-					}
-
-					wc_deprecated_function( 'Your theme version of my-account.php template', '2.6', 'the latest version, which supports multiple account pages and navigation, from WC 2.6.0' );
-				}
-			}
-
-			// Send output buffer.
-			ob_end_flush();
+        // After logging out without a nonce, add confirmation message.
+		if ( isset( $wp->query_vars['customer-logout'] ) && is_user_logged_in() ) {
+			/* translators: %s: logout url */
+			wc_add_notice( sprintf( __( 'Are you sure you want to log out? <a href="%s">Confirm and log out</a>', 'classsic-commerce' ), wc_logout_url() ) );
 		}
 	}
 
@@ -130,8 +117,11 @@ class WC_Shortcode_My_Account {
 	public static function view_order( $order_id ) {
 		$order = wc_get_order( $order_id );
 
-		if ( ! current_user_can( 'view_order', $order_id ) ) {
-			echo '<div class="woocommerce-error">' . esc_html__( 'Invalid order.', 'classic-commerce' ) . ' <a href="' . esc_url( wc_get_page_permalink( 'myaccount' ) ) . '" class="wc-forward">' . esc_html__( 'My account', 'classic-commerce' ) . '</a></div>';
+		if ( ! $order || ! current_user_can( 'view_order', $order_id ) ) {
+			wc_print_notice(
+				esc_html__( 'Invalid order.', 'classic-commerce' ) . ' <a href="' . esc_url( wc_get_page_permalink( 'myaccount' ) ) . '" class="wc-forward">' . esc_html__( 'My account', 'classic-commerce' ) . '</a>',
+				'error'
+            );
 
 			return;
 		}
@@ -143,8 +133,8 @@ class WC_Shortcode_My_Account {
 		wc_get_template(
 			'myaccount/view-order.php', array(
 				'status'   => $status, // @deprecated WC-2.2.
-				'order'    => wc_get_order( $order_id ),
-				'order_id' => $order_id,
+                'order'    => $order,
+				'order_id' => $order->get_id(),
 			)
 		);
 	}
@@ -271,7 +261,7 @@ class WC_Shortcode_My_Account {
 
 		$errors = new WP_Error();
 
-		do_action( 'lostpassword_post', $errors );
+		do_action( 'lostpassword_post', $errors, $user_data );
 
 		if ( $errors->get_error_code() ) {
 			wc_add_notice( $errors->get_error_message(), 'error' );
@@ -354,7 +344,9 @@ class WC_Shortcode_My_Account {
 		wp_set_password( $new_pass, $user->ID );
 		self::set_reset_password_cookie();
 
-		wp_password_change_notification( $user );
+		if ( ! apply_filters( 'woocommerce_disable_password_change_notification', false ) ) {
+			wp_password_change_notification( $user );
+		}
 	}
 
 	/**

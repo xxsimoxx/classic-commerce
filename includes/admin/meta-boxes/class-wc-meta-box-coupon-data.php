@@ -90,7 +90,7 @@ class WC_Meta_Box_Coupon_Data {
 						'label'       => __( 'Coupon amount', 'classic-commerce' ),
 						'placeholder' => wc_format_localized_price( 0 ),
 						'description' => __( 'Value of the coupon.', 'classic-commerce' ),
-						'data_type'   => 'price',
+						'data_type'   => 'percent' === $coupon->get_discount_type( 'edit' ) ? 'decimal' : 'price',
 						'desc_tip'    => true,
 						'value'       => $coupon->get_amount( 'edit' ),
 					)
@@ -116,7 +116,8 @@ class WC_Meta_Box_Coupon_Data {
 						'value'             => esc_attr( $expiry_date ),
 						'label'             => __( 'Coupon expiry date', 'classic-commerce' ),
 						'placeholder'       => 'YYYY-MM-DD',
-						'description'       => '',
+                        'description'       => __( 'The coupon will expire at 00:00:00 of this date.', 'classic-commerce' ),
+						'desc_tip'          => true,
 						'class'             => 'date-picker',
 						'custom_attributes' => array(
 							'pattern' => apply_filters( 'woocommerce_date_input_html_pattern', '[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])' ),
@@ -192,7 +193,7 @@ class WC_Meta_Box_Coupon_Data {
 						foreach ( $product_ids as $product_id ) {
 							$product = wc_get_product( $product_id );
 							if ( is_object( $product ) ) {
-								echo '<option value="' . esc_attr( $product_id ) . '"' . selected( true, true, false ) . '>' . wp_kses_post( $product->get_formatted_name() ) . '</option>';
+								echo '<option value="' . esc_attr( $product_id ) . '"' . selected( true, true, false ) . '>' . esc_html( wp_strip_all_tags( $product->get_formatted_name() ) ) . '</option>';
 							}
 						}
 						?>
@@ -210,7 +211,7 @@ class WC_Meta_Box_Coupon_Data {
 						foreach ( $product_ids as $product_id ) {
 							$product = wc_get_product( $product_id );
 							if ( is_object( $product ) ) {
-								echo '<option value="' . esc_attr( $product_id ) . '"' . selected( true, true, false ) . '>' . wp_kses_post( $product->get_formatted_name() ) . '</option>';
+								echo '<option value="' . esc_attr( $product_id ) . '"' . selected( true, true, false ) . '>' . esc_html( wp_strip_all_tags( $product->get_formatted_name() ) ) . '</option>';
 							}
 						}
 						?>

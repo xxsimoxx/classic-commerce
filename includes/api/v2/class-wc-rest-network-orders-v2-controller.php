@@ -4,8 +4,8 @@
  *
  * Handles requests to the /orders/network endpoint
  *
- * @package  ClassicCommerce/API
- * @since    WC-3.4.0
+ * @package ClassicCommerce\RestApi
+ * @since    3.4.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Network Orders controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Orders_V2_Controller
  */
 class WC_REST_Network_Orders_V2_Controller extends WC_REST_Orders_V2_Controller {
@@ -31,7 +31,9 @@ class WC_REST_Network_Orders_V2_Controller extends WC_REST_Orders_V2_Controller 
 	public function register_routes() {
 		if ( is_multisite() ) {
 			register_rest_route(
-				$this->namespace, '/' . $this->rest_base . '/network', array(
+				$this->namespace,
+				'/' . $this->rest_base . '/network',
+				array(
 					array(
 						'methods'             => WP_REST_Server::READABLE,
 						'callback'            => array( $this, 'network_orders' ),
@@ -46,8 +48,6 @@ class WC_REST_Network_Orders_V2_Controller extends WC_REST_Orders_V2_Controller 
 
 	/**
 	 * Retrieves the item's schema for display / public consumption purposes.
-	 *
-	 * @access public
 	 *
 	 * @return array Public item schema data.
 	 */
@@ -118,9 +118,24 @@ class WC_REST_Network_Orders_V2_Controller extends WC_REST_Orders_V2_Controller 
 	public function network_orders( $request ) {
 		$blog_id = $request->get_param( 'blog_id' );
 		$blog_id = ! empty( $blog_id ) ? $blog_id : get_current_blog_id();
+		$active_plugins = get_blog_option( $blog_id, 'active_plugins', array() );
+		$network_active_plugins = array_keys( get_site_option( 'active_sitewide_plugins', array() ) );
+
+		$plugins = array_merge( $active_plugins, $network_active_plugins );
+		$wc_active = false;
+		foreach ( $plugins as $plugin ) {
+			if ( substr_compare( $plugin, '/woocommerce.php', strlen( $plugin ) - strlen( '/woocommerce.php' ), strlen( '/woocommerce.php' ) ) === 0 ) {
+				$wc_active = true;
+			}
+		}
+
+		// If WooCommerce not active for site, return an empty response.
+		if ( ! $wc_active ) {
+			$response = rest_ensure_response( array() );
+			return $response;
+		}
 
 		switch_to_blog( $blog_id );
-
 		add_filter( 'woocommerce_rest_orders_prepare_object_query', array( $this, 'network_orders_filter_args' ) );
 		$items = $this->get_items( $request );
 		remove_filter( 'woocommerce_rest_orders_prepare_object_query', array( $this, 'network_orders_filter_args' ) );

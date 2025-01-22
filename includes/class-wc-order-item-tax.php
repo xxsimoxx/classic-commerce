@@ -27,6 +27,7 @@ class WC_Order_Item_Tax extends WC_Order_Item {
 		'compound'           => false,
 		'tax_total'          => 0,
 		'shipping_tax_total' => 0,
+        'rate_percent'       => null,
 	);
 
 	/*
@@ -96,6 +97,15 @@ class WC_Order_Item_Tax extends WC_Order_Item {
 	 */
 	public function set_compound( $value ) {
 		$this->set_prop( 'compound', (bool) $value );
+	}
+
+    /**
+	 * Set rate value.
+	 *
+	 * @param float $value tax rate value.
+	 */
+	public function set_rate_percent( $value ) {
+		$this->set_prop( 'rate_percent', (float) $value );
 	}
 
 	/**
@@ -211,6 +221,16 @@ class WC_Order_Item_Tax extends WC_Order_Item {
 		return $this->get_compound();
 	}
 
+    /**
+	 * Get rate value
+	 *
+	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
+	 * @return float
+	 */
+	public function get_rate_percent( $context = 'view' ) {
+		return $this->get_prop( 'rate_percent', $context );
+	}
+
 	/*
 	|--------------------------------------------------------------------------
 	| Array Access Methods
@@ -223,11 +243,11 @@ class WC_Order_Item_Tax extends WC_Order_Item {
 	/**
 	 * O for ArrayAccess/Backwards compatibility.
 	 *
-	 * @deprecated Add deprecation notices in future release.
 	 * @param      string $offset Offset.
 	 * @return     mixed
 	 */
-	public function offsetGet( $offset ) {
+    #[\ReturnTypeWillChange]
+	public function offsetGet( $offset ) : mixed {
 		if ( 'tax_amount' === $offset ) {
 			$offset = 'tax_total';
 		} elseif ( 'shipping_tax_amount' === $offset ) {
@@ -239,11 +259,13 @@ class WC_Order_Item_Tax extends WC_Order_Item {
 	/**
 	 * OffsetSet for ArrayAccess/Backwards compatibility.
 	 *
-	 * @deprecated Add deprecation notices in future release.
+	 * @deprecated 4.4.0.
 	 * @param      string $offset Offset.
 	 * @param      mixed  $value  Value.
 	 */
-	public function offsetSet( $offset, $value ) {
+    #[\ReturnTypeWillChange]
+	public function offsetSet( $offset, $value ) : void {
+        wc_deprecated_function( 'WC_Order_Item_Product::offsetSet', '4.4.0', '' );
 		if ( 'tax_amount' === $offset ) {
 			$offset = 'tax_total';
 		} elseif ( 'shipping_tax_amount' === $offset ) {
@@ -258,7 +280,8 @@ class WC_Order_Item_Tax extends WC_Order_Item {
 	 * @param string $offset Offset.
 	 * @return bool
 	 */
-	public function offsetExists( $offset ) {
+    #[\ReturnTypeWillChange]
+	public function offsetExists( $offset ) : bool {
 		if ( in_array( $offset, array( 'tax_amount', 'shipping_tax_amount' ), true ) ) {
 			return true;
 		}

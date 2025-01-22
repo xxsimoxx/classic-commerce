@@ -114,7 +114,7 @@ class WC_Action_Queue implements WC_Queue_Interface {
 	}
 
 	/**
-	 * Get the date and time for the next scheduled occurence of an action with a given hook
+	 * Get the date and time for the next scheduled occurrence of an action with a given hook
 	 * (an optionally that matches certain args and group), if any.
 	 *
 	 * @param string $hook The hook that the job will trigger.
@@ -126,8 +126,8 @@ class WC_Action_Queue implements WC_Queue_Interface {
 
 		$next_timestamp = as_next_scheduled_action( $hook, $args, $group );
 
-		if ( $next_timestamp ) {
-			return wc_string_to_datetime( $next_timestamp );
+		if ( is_numeric( $next_timestamp ) ) {
+			return new WC_DateTime( "@{$next_timestamp}", new DateTimeZone( 'UTC' ) );
 		}
 
 		return null;

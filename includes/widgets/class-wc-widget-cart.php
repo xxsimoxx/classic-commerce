@@ -36,6 +36,10 @@ class WC_Widget_Cart extends WC_Widget {
 			),
 		);
 
+		if ( is_customize_preview() ) {
+			wp_enqueue_script( 'wc-cart-fragments' );
+		}
+
 		parent::__construct();
 	}
 
@@ -52,7 +56,13 @@ class WC_Widget_Cart extends WC_Widget {
 			return;
 		}
 
+		wp_enqueue_script( 'wc-cart-fragments' );
+
 		$hide_if_empty = empty( $instance['hide_if_empty'] ) ? 0 : 1;
+
+		if ( ! isset( $instance['title'] ) ) {
+			$instance['title'] = __( 'Cart', 'classic-commerce' );
+		}
 
 		$this->widget_start( $args, $instance );
 

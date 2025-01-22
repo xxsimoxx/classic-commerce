@@ -51,6 +51,13 @@ class WC_Tax_Rate_Importer extends WP_Importer {
 		$this->delimiter   = empty( $_POST['delimiter'] ) ? ',' : (string) wc_clean( wp_unslash( $_POST['delimiter'] ) ); // WPCS: CSRF ok.
 	}
 
+    /**
+	 * Error message for import.
+	 *
+	 * @var string
+	 */
+	public $import_error_message;
+
 	/**
 	 * Registered callback function for the WordPress Importer.
 	 *
@@ -75,6 +82,8 @@ class WC_Tax_Rate_Importer extends WP_Importer {
 					$file = get_attached_file( $this->id );
 					add_filter( 'http_request_timeout', array( $this, 'bump_request_timeout' ) );
 					$this->import( $file );
+                    } else {
+					$this->import_error( $this->import_error_message );
 				}
 				break;
 		}
@@ -92,7 +101,6 @@ class WC_Tax_Rate_Importer extends WP_Importer {
 		wc_set_time_limit( 0 );
 		@ob_flush();
 		@flush();
-		@ini_set( 'auto_detect_line_endings', '1' );
 	}
 
 	/**
@@ -201,45 +209,40 @@ class WC_Tax_Rate_Importer extends WP_Importer {
 	 * @return bool False if error uploading or invalid file, true otherwise
 	 */
 	public function handle_upload() {
-		if ( ! isset( $_FILES['import'] ) || $_FILES['import']['name'] == '' ) {
-		  $this->import_error( __( 'File is empty. This error could also be caused by uploads being disabled in your php.ini or by post_max_size being defined as smaller than upload_max_filesize in php.ini.', 'classic-commerce' ) );
+        $file_url = isset( $_POST['file_url'] ) ? wc_clean( wp_unslash( $_POST['file_url'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.NoNonceVerification -- Nonce already verified in WC_Tax_Rate_Importer::dispatch()
+
+		if ( empty( $file_url ) ) {
+			$file = wp_import_handle_upload();
+			if ( isset( $file['error'] ) ) {
+				$this->set_import_error_message( $file['error'] );
+
+				return false;
+			}
+
+			if ( ! wc_is_file_valid_csv( $file['file'], false ) ) {
+				// Remove file if not valid.
+				wp_delete_attachment( $file['id'], true );
+
+				$this->set_import_error_message( __( 'Invalid file type. The importer supports CSV and TXT file formats.', 'classic-commerce' ) );
+
+				return false;
+			}
+
+			$this->id = absint( $file['id'] );
+		} elseif (
+			( 0 === stripos( realpath( ABSPATH . $file_url ), ABSPATH ) ) &&
+			file_exists( ABSPATH . $file_url )
+		) {
+			if ( ! wc_is_file_valid_csv( ABSPATH . $file_url ) ) {
+				$this->set_import_error_message( __( 'Invalid file type. The importer supports CSV and TXT file formats.', 'classic-commerce' ) );
+
+				return false;
+			}
+
+			$this->file_url = esc_attr( $file_url );
+		} else {
+			return false;
 		}
-
-		if ( ! wc_is_file_valid_csv( $_FILES['import']['name'], false ) ) {
-			$this->import_error( __( 'Invalid file type. The importer supports CSV and TXT file formats.', 'classic-commerce' ) );
-		}
-
-		$overrides = array(
-			'test_form' => false,
-			'mimes'     => self::get_valid_csv_filetypes(),
-		);
-		$import    = $_FILES['import']; // WPCS: sanitization ok, input var ok.
-		$upload    = wp_handle_upload( $import, $overrides );
-
-		if ( isset( $upload['error'] ) ) {
-			$this->import_error( $upload['error'] );
-		}
-
-		// Construct the object array.
-		$object = array(
-		  'post_title'     => basename( $upload['file'] ),
-		  'post_content'   => $upload['url'],
-		  'post_mime_type' => $upload['type'],
-		  'guid'           => $upload['url'],
-		  'context'        => 'import',
-		  'post_status'    => 'private',
-		);
-
-		// Save the data.
-		$id = wp_insert_attachment( $object, $upload['file'] );
-
-		/*
-		 * Schedule a cleanup for one day from now in case of failed
-		 * import or missing wp_import_cleanup() call.
-		 */
-		wp_schedule_single_event( time() + DAY_IN_SECONDS, 'importer_scheduled_cleanup', array( $id ) );
-
-		$this->id = absint( $id );
 
 		return true;
 	}

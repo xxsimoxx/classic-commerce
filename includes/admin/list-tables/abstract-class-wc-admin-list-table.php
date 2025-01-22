@@ -3,7 +3,7 @@
  * List tables.
  *
  * @package  ClassicCommerce/Admin
- * @version  WC-3.3.0
+ * @version  3.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -72,7 +72,7 @@ abstract class WC_Admin_List_Table {
 
 			$this->render_blank_state();
 
-			echo '<style type="text/css">#posts-filter .wp-list-table, #posts-filter .tablenav.top, .tablenav.bottom .actions, .wrap .subsubsub  { display: none; } </style>';
+			echo '<style type="text/css">#posts-filter .wp-list-table, #posts-filter .tablenav.top, .tablenav.bottom .actions, .wrap .subsubsub  { display: none; } #posts-filter .tablenav.bottom { height: auto; } </style>';
 		}
 	}
 
@@ -259,7 +259,7 @@ abstract class WC_Admin_List_Table {
 
 		if ( is_callable( array( $this, 'render_' . $column . '_column' ) ) ) {
 			$this->{"render_{$column}_column"}();
-		}
+        }
 	}
 
 	/**

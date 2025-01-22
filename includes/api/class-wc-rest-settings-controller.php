@@ -4,8 +4,8 @@
  *
  * Handles requests to the /settings endpoints.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Settings controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Settings_V2_Controller
  */
 class WC_REST_Settings_Controller extends WC_REST_Settings_V2_Controller {
@@ -61,7 +61,7 @@ class WC_REST_Settings_Controller extends WC_REST_Settings_V2_Controller {
 	 * @return WP_Error|WP_REST_Response
 	 */
 	public function update_item( $request ) {
-		$options_controller = new WC_REST_Dev_Setting_Options_Controller();
+		$options_controller = new WC_REST_Setting_Options_Controller();
 		$response           = $options_controller->update_item( $request );
 
 		return $response;
@@ -70,7 +70,7 @@ class WC_REST_Settings_Controller extends WC_REST_Settings_V2_Controller {
 	/**
 	 * Get the groups schema, conforming to JSON Schema.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @return array
 	 */
 	public function get_item_schema() {

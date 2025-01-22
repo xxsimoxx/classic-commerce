@@ -6,7 +6,7 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates
- * @version WC-3.4.0
+ * @version WC-7.8.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -41,6 +41,8 @@ if ( $available_gateways ) : ?>
 				?>
 			</ul>
 
+            <?php do_action( 'woocommerce_add_payment_method_form_bottom' ); ?>
+
 			<div class="form-row">
 				<?php wp_nonce_field( 'woocommerce-add-payment-method', 'woocommerce-add-payment-method-nonce' ); ?>
 				<button type="submit" class="woocommerce-Button woocommerce-Button--alt button alt" id="place_order" value="<?php esc_attr_e( 'Add payment method', 'classic-commerce' ); ?>"><?php esc_html_e( 'Add payment method', 'classic-commerce' ); ?></button>
@@ -49,5 +51,5 @@ if ( $available_gateways ) : ?>
 		</div>
 	</form>
 <?php else : ?>
-	<p class="woocommerce-notice woocommerce-notice--info woocommerce-info"><?php esc_html_e( 'New payment methods can only be added during checkout. Please contact us if you require assistance.', 'classic-commerce' ); ?></p>
+	<?php wc_print_notice( esc_html__( 'New payment methods can only be added during checkout. Please contact us if you require assistance.', 'classic-commerce' ), 'notice' ); ?>
 <?php endif; ?>

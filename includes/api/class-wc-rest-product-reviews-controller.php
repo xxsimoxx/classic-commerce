@@ -4,8 +4,8 @@
  *
  * Handles requests to /products/reviews.
  *
- * @package ClassicCommerce/API
- * @since  WC-3.5.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.5.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Product Reviews Controller Class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Controller
  */
 class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
@@ -149,10 +149,12 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 	 * @return WP_Error|boolean
 	 */
 	public function get_item_permissions_check( $request ) {
-		$id     = (int) $request['id'];
-		$review = get_comment( $id );
+		$review = $this->get_review( (int) $request['id'] );
+		if ( is_wp_error( $review ) ) {
+			return $review;
+		}
 
-		if ( $review && ! wc_rest_check_product_reviews_permissions( 'read', $review->comment_ID ) ) {
+		if ( ! wc_rest_check_product_reviews_permissions( 'read', (int) $request['id'] ) ) {
 			return new WP_Error( 'woocommerce_rest_cannot_view', __( 'Sorry, you cannot view this resource.', 'classic-commerce' ), array( 'status' => rest_authorization_required_code() ) );
 		}
 
@@ -180,10 +182,12 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 	 * @return WP_Error|boolean
 	 */
 	public function update_item_permissions_check( $request ) {
-		$id     = (int) $request['id'];
-		$review = get_comment( $id );
+		$review = $this->get_review( (int) $request['id'] );
+		if ( is_wp_error( $review ) ) {
+			return $review;
+		}
 
-		if ( $review && ! wc_rest_check_product_reviews_permissions( 'edit', $review->comment_ID ) ) {
+		if ( ! wc_rest_check_product_reviews_permissions( 'edit', (int) $request['id'] ) ) {
 			return new WP_Error( 'woocommerce_rest_cannot_edit', __( 'Sorry, you cannot edit this resource.', 'classic-commerce' ), array( 'status' => rest_authorization_required_code() ) );
 		}
 
@@ -197,11 +201,13 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 	 * @return WP_Error|boolean
 	 */
 	public function delete_item_permissions_check( $request ) {
-		$id     = (int) $request['id'];
-		$review = get_comment( $id );
+		$review = $this->get_review( (int) $request['id'] );
+		if ( is_wp_error( $review ) ) {
+			return $review;
+		}
 
-		if ( $review && ! wc_rest_check_product_reviews_permissions( 'delete', $review->comment_ID ) ) {
-			return new WP_Error( 'woocommerce_rest_cannot_edit', __( 'Sorry, you cannot delete this resource.', 'classic-commerce' ), array( 'status' => rest_authorization_required_code() ) );
+		if ( ! wc_rest_check_product_reviews_permissions( 'delete', (int) $request['id'] ) ) {
+			return new WP_Error( 'woocommerce_rest_cannot_delete', __( 'Sorry, you cannot delete this resource.', 'classic-commerce' ), array( 'status' => rest_authorization_required_code() ) );
 		}
 
 		return true;
@@ -214,7 +220,7 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 	 * @return boolean|WP_Error
 	 */
 	public function batch_items_permissions_check( $request ) {
-		if ( ! wc_rest_check_product_reviews_permissions( 'create' ) ) {
+		if ( ! wc_rest_check_product_reviews_permissions( 'batch' ) ) {
 			return new WP_Error( 'woocommerce_rest_cannot_batch', __( 'Sorry, you are not allowed to batch manipulate this resource.', 'classic-commerce' ), array( 'status' => rest_authorization_required_code() ) );
 		}
 
@@ -298,7 +304,7 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 		/**
 		 * Filters arguments, before passing to WP_Comment_Query, when querying reviews via the REST API.
 		 *
-		 * @since  WC-3.5.0
+		 * @since 3.5.0
 		 * @link https://developer.wordpress.org/reference/classes/wp_comment_query/
 		 * @param array           $prepared_args Array of arguments for WP_Comment_Query.
 		 * @param WP_REST_Request $request       The current request.
@@ -445,7 +451,7 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 		 * Returning a WP_Error value from the filter will shortcircuit insertion and allow
 		 * skipping further processing.
 		 *
-		 * @since  WC-3.5.0
+		 * @since 3.5.0
 		 * @param array|WP_Error  $prepared_review The prepared review data for wp_insert_comment().
 		 * @param WP_REST_Request $request          Request used to insert the review.
 		 */
@@ -465,6 +471,10 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 		}
 
 		update_comment_meta( $review_id, 'rating', ! empty( $request['rating'] ) ? $request['rating'] : '0' );
+
+		if ( isset( $request['verified'] ) && ! empty( $request['verified'] ) ) {
+			update_comment_meta( $review_id, 'verified', $request['verified'] );
+		}
 
 		$review = get_comment( $review_id );
 
@@ -580,6 +590,10 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 			update_comment_meta( $id, 'rating', $request['rating'] );
 		}
 
+		if ( isset( $request['verified'] ) && ! empty( $request['verified'] ) ) {
+			update_comment_meta( $id, 'verified', $request['verified'] );
+		}
+
 		$review = get_comment( $id );
 
 		/** This action is documented in includes/api/class-wc-rest-product-reviews-controller.php */
@@ -617,7 +631,7 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 		 *
 		 * Return false to disable trash support for the post.
 		 *
-		 * @since  WC-3.5.0
+		 * @since 3.5.0
 		 * @param bool       $supports_trash Whether the post type support trashing.
 		 * @param WP_Comment $review         The review object being considered for trashing support.
 		 */
@@ -691,6 +705,12 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 		if ( in_array( 'product_id', $fields, true ) ) {
 			$data['product_id'] = (int) $review->comment_post_ID;
 		}
+		if ( in_array( 'product_name', $fields, true ) ) {
+			$data['product_name'] = get_the_title( (int) $review->comment_post_ID );
+		}
+		if ( in_array( 'product_permalink', $fields, true ) ) {
+			$data['product_permalink'] = get_permalink( (int) $review->comment_post_ID );
+		}
 		if ( in_array( 'status', $fields, true ) ) {
 			$data['status'] = $this->prepare_status_response( (string) $review->comment_approved );
 		}
@@ -738,6 +758,7 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 	 * @return array|WP_Error  $prepared_review
 	 */
 	protected function prepare_item_for_database( $request ) {
+		$prepared_review = array();
 		if ( isset( $request['id'] ) ) {
 			$prepared_review['comment_ID'] = (int) $request['id'];
 		}
@@ -777,7 +798,7 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 		 *
 		 * Allows modification of the review right after it is prepared for the database.
 		 *
-		 * @since  WC-3.5.0
+		 * @since 3.5.0
 		 * @param array           $prepared_review The prepared review data for `wp_insert_comment`.
 		 * @param WP_REST_Request $request         The current request.
 		 */
@@ -849,6 +870,18 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 					'description' => __( 'Unique identifier for the product that the review belongs to.', 'classic-commerce' ),
 					'type'        => 'integer',
 					'context'     => array( 'view', 'edit' ),
+				),
+				'product_name'       => array(
+					'description' => __( 'Product name.', 'classic-commerce' ),
+					'type'        => 'string',
+					'context'     => array( 'view', 'edit' ),
+				),
+				'product_permalink'       => array(
+					'description' => __( 'Product URL.', 'classic-commerce' ),
+					'type'        => 'string',
+					'format'      => 'uri',
+					'context'     => array( 'view', 'edit' ),
+					'readonly'    => true,
 				),
 				'status'           => array(
 					'description' => __( 'Status of the review.', 'classic-commerce' ),
@@ -1025,16 +1058,16 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 		 * collection parameter to an internal WP_Comment_Query parameter. Use the
 		 * `wc_rest_review_query` filter to set WP_Comment_Query parameters.
 		 *
-		 * @since  WC-3.5.0
+		 * @since 3.5.0
 		 * @param array $params JSON Schema-formatted collection parameters.
 		 */
 		return apply_filters( 'woocommerce_rest_product_review_collection_params', $params );
 	}
 
 	/**
-	 * Get the reivew, if the ID is valid.
+	 * Get the review, if the ID is valid.
 	 *
-	 * @since  WC-3.5.0
+	 * @since 3.5.0
 	 * @param int $id Supplied ID.
 	 * @return WP_Comment|WP_Error Comment object if ID is valid, WP_Error otherwise.
 	 */
@@ -1047,13 +1080,11 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 		}
 
 		$review = get_comment( $id );
-		if ( empty( $review ) ) {
+		if ( empty( $review ) || 'review' !== get_comment_type( $id ) ) {
 			return $error;
 		}
 
 		if ( ! empty( $review->comment_post_ID ) ) {
-			$post = get_post( (int) $review->comment_post_ID );
-
 			if ( 'product' !== get_post_type( (int) $review->comment_post_ID ) ) {
 				return new WP_Error( 'woocommerce_rest_product_invalid_id', __( 'Invalid product ID.', 'classic-commerce' ), array( 'status' => 404 ) );
 			}
@@ -1065,7 +1096,7 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 	/**
 	 * Prepends internal property prefix to query parameters to match our response fields.
 	 *
-	 * @since  WC-3.5.0
+	 * @since 3.5.0
 	 * @param string $query_param Query parameter.
 	 * @return string
 	 */
@@ -1093,7 +1124,7 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 	/**
 	 * Checks comment_approved to set comment status for single comment output.
 	 *
-	 * @since  WC-3.5.0
+	 * @since 3.5.0
 	 * @param string|int $comment_approved comment status.
 	 * @return string Comment status.
 	 */
@@ -1120,7 +1151,7 @@ class WC_REST_Product_Reviews_Controller extends WC_REST_Controller {
 	/**
 	 * Sets the comment_status of a given review object when creating or updating a review.
 	 *
-	 * @since  WC-3.5.0
+	 * @since 3.5.0
 	 * @param string|int $new_status New review status.
 	 * @param int        $id         Review ID.
 	 * @return bool Whether the status was changed.

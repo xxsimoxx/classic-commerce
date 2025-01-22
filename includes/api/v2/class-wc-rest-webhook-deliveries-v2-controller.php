@@ -4,8 +4,8 @@
  *
  * Handles requests to the /webhooks/<webhook_id>/deliveries endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,9 +13,9 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Webhook Deliveries controller class.
  *
- * @deprecated WC-3.3.0 Webhooks deliveries logs now uses logging system.
- * @package    ClassicCommerce/API
- * @extends    WC_REST_Webhook_Deliveries_V1_Controller
+ * @deprecated 3.3.0 Webhooks deliveries logs now uses logging system.
+ * @package ClassicCommerce\RestApi
+ * @extends WC_REST_Webhook_Deliveries_V1_Controller
  */
 class WC_REST_Webhook_Deliveries_V2_Controller extends WC_REST_Webhook_Deliveries_V1_Controller {
 

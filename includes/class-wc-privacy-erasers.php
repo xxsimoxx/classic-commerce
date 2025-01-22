@@ -49,8 +49,8 @@ class WC_Privacy_Erasers {
 			'billing_city'        => __( 'Billing City', 'classic-commerce' ),
 			'billing_postcode'    => __( 'Billing Postal/Zip Code', 'classic-commerce' ),
 			'billing_state'       => __( 'Billing State', 'classic-commerce' ),
-			'billing_country'     => __( 'Billing Country', 'classic-commerce' ),
-			'billing_phone'       => __( 'Phone Number', 'classic-commerce' ),
+			'billing_country'     => __( 'Billing Country / Region', 'classic-commerce' ),
+			'billing_phone'       => __( 'Billing Phone Number', 'classic-commerce' ),
 			'billing_email'       => __( 'Email Address', 'classic-commerce' ),
 			'shipping_first_name' => __( 'Shipping First Name', 'classic-commerce' ),
 			'shipping_last_name'  => __( 'Shipping Last Name', 'classic-commerce' ),
@@ -60,7 +60,8 @@ class WC_Privacy_Erasers {
 			'shipping_city'       => __( 'Shipping City', 'classic-commerce' ),
 			'shipping_postcode'   => __( 'Shipping Postal/Zip Code', 'classic-commerce' ),
 			'shipping_state'      => __( 'Shipping State', 'classic-commerce' ),
-			'shipping_country'    => __( 'Shipping Country', 'classic-commerce' ),
+			'shipping_country'    => __( 'Shipping Country / Region', 'classic-commerce' ),
+            'shipping_phone'      => __( 'Shipping Phone Number', 'classic-commerce' ),
 		), $customer );
 
 		foreach ( $props_to_erase as $prop => $label ) {
@@ -251,6 +252,7 @@ class WC_Privacy_Erasers {
 			'shipping_postcode'   => 'text',
 			'shipping_state'      => 'address_state',
 			'shipping_country'    => 'address_country',
+            'shipping_phone'      => 'phone',
 			'customer_id'         => 'numeric_id',
 			'transaction_id'      => 'numeric_id',
 		), $order );

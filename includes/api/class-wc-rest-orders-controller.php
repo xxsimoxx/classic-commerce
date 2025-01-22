@@ -4,16 +4,19 @@
  *
  * Handles requests to the /orders endpoint.
  *
- * @package  ClassicCommerce/API
- * @since    WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since    2.6.0
  */
+
+use ClassicCommerce\Utilities\ArrayUtil;
+use ClassicCommerce\Utilities\StringUtil;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * REST API Orders controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Orders_V2_Controller
  */
 class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
@@ -34,28 +37,58 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 	 * @return bool
 	 */
 	protected function calculate_coupons( $request, $order ) {
-		if ( ! isset( $request['coupon_lines'] ) || ! is_array( $request['coupon_lines'] ) ) {
+		if ( ! isset( $request['coupon_lines'] ) ) {
 			return false;
 		}
 
-		// Remove all coupons first to ensure calculation is correct.
-		foreach ( $order->get_items( 'coupon' ) as $coupon ) {
-			$order->remove_coupon( $coupon->get_code() );
-		}
+		// Validate input and at the same time store the processed coupon codes to apply.
+
+		$coupon_codes = array();
+		$discounts    = new WC_Discounts( $order );
+
+		$current_order_coupons      = array_values( $order->get_coupons() );
+		$current_order_coupon_codes = array_map(
+			function( $coupon ) {
+				return $coupon->get_code();
+			},
+			$current_order_coupons
+		);
 
 		foreach ( $request['coupon_lines'] as $item ) {
-			if ( is_array( $item ) ) {
-				if ( empty( $item['id'] ) ) {
-					if ( empty( $item['code'] ) ) {
-						throw new WC_REST_Exception( 'woocommerce_rest_invalid_coupon', __( 'Coupon code is required.', 'classic-commerce' ), 400 );
-					}
+			if ( ! empty( $item['id'] ) ) {
+				throw new WC_REST_Exception( 'woocommerce_rest_coupon_item_id_readonly', __( 'Coupon item ID is readonly.', 'classic-commerce' ), 400 );
+			}
 
-					$results = $order->apply_coupon( wc_clean( $item['code'] ) );
+			$coupon_code = ArrayUtil::get_value_or_default( $item, 'code' );
+			if ( StringUtil::is_null_or_whitespace( $coupon_code ) ) {
+				throw new WC_REST_Exception( 'woocommerce_rest_invalid_coupon', __( 'Coupon code is required.', 'classic-commerce' ), 400 );
+			}
 
-					if ( is_wp_error( $results ) ) {
-						throw new WC_REST_Exception( 'woocommerce_rest_' . $results->get_error_code(), $results->get_error_message(), 400 );
-					}
+			$coupon_code = wc_format_coupon_code( wc_clean( $coupon_code ) );
+			$coupon      = new WC_Coupon( $coupon_code );
+
+			// Skip check if the coupon is already applied to the order, as this could wrongly throw an error for single-use coupons.
+			if ( ! in_array( $coupon_code, $current_order_coupon_codes, true ) ) {
+				$check_result = $discounts->is_coupon_valid( $coupon );
+				if ( is_wp_error( $check_result ) ) {
+					throw new WC_REST_Exception( 'woocommerce_rest_' . $check_result->get_error_code(), $check_result->get_error_message(), 400 );
 				}
+			}
+
+			$coupon_codes[] = $coupon_code;
+		}
+
+		// Remove all coupons first to ensure calculation is correct.
+		foreach ( $order->get_items( 'coupon' ) as $existing_coupon ) {
+			$order->remove_coupon( $existing_coupon->get_code() );
+		}
+
+		// Apply the coupons.
+		foreach ( $coupon_codes as $new_coupon ) {
+			$results = $order->apply_coupon( $new_coupon );
+
+			if ( is_wp_error( $results ) ) {
+				throw new WC_REST_Exception( 'woocommerce_rest_' . $results->get_error_code(), $results->get_error_message(), 400 );
 			}
 		}
 
@@ -97,7 +130,7 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 							foreach ( $value as $item ) {
 								if ( is_array( $item ) ) {
 									if ( $this->item_is_null( $item ) || ( isset( $item['quantity'] ) && 0 === $item['quantity'] ) ) {
-										$order->remove_item( $item['id'] );
+										$this->remove_item( $order, $key, $item['id'] );
 									} else {
 										$this->set_item( $order, $key, $item );
 									}
@@ -134,10 +167,50 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 		return apply_filters( "woocommerce_rest_pre_insert_{$this->post_type}_object", $order, $request, $creating );
 	}
 
+    /**
+	 * Wrapper method to remove order items.
+	 * When updating, the item ID provided is checked to ensure it is associated
+	 * with the order.
+	 *
+	 * @param WC_Order $order     The order to remove the item from.
+	 * @param string   $item_type The item type (from the request, not from the item, e.g. 'line_items' rather than 'line_item').
+	 * @param int      $item_id   The ID of the item to remove.
+	 *
+	 * @return void
+	 * @throws WC_REST_Exception If item ID is not associated with order.
+	 */
+	protected function remove_item( WC_Order $order, string $item_type, int $item_id ): void {
+		$item = $order->get_item( $item_id );
+
+		if ( ! $item ) {
+			throw new WC_REST_Exception(
+				'woocommerce_rest_invalid_item_id',
+				esc_html__( 'Order item ID provided is not associated with order.', 'classic-commerce' ),
+				400
+			);
+		}
+
+		if ( 'line_items' === $item_type ) {
+			require_once WC_ABSPATH . 'includes/admin/wc-admin-functions.php';
+			wc_maybe_adjust_line_item_product_stock( $item, 0 );
+		}
+
+		/**
+		 * Allow extensions be notified before the item is removed.
+		 *
+		 * @param WC_Order_Item $item The item object.
+		 *
+		 * @since 9.3.0.
+		 */
+		do_action( 'woocommerce_rest_remove_order_item', $item );
+
+		$order->remove_item( $item_id );
+	}
+
 	/**
 	 * Save an object data.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @throws WC_REST_Exception But all errors are validated before returning any data.
 	 * @param  WP_REST_Request $request  Full details about the request.
 	 * @param  bool            $creating If is creating a new object.
@@ -162,13 +235,14 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 
 				// Make sure customer is part of blog.
 				if ( is_multisite() && ! is_user_member_of_blog( $request['customer_id'] ) ) {
-					throw new WC_REST_Exception( 'woocommerce_rest_invalid_customer_id_network', __( 'Customer ID does not belong to this site.', 'classic-commerce' ), 400 );
+					add_user_to_blog( get_current_blog_id(), $request['customer_id'], 'customer' );
 				}
 			}
 
 			if ( $creating ) {
 				$object->set_created_via( 'rest-api' );
 				$object->set_prices_include_tax( 'yes' === get_option( 'woocommerce_prices_include_tax' ) );
+                $object->save();
 				$object->calculate_totals();
 			} else {
 				// If items have changed, recalculate order totals.
@@ -182,7 +256,8 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 
 			// Set status.
 			if ( ! empty( $request['status'] ) ) {
-				$object->set_status( $request['status'] );
+                $manual_update = isset( $request['manual_update'] ) ? $request['manual_update'] : false;
+				$object->set_status( $request['status'], '', $manual_update );
 			}
 
 			$object->save();
@@ -205,12 +280,12 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 	/**
 	 * Prepare objects query.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WP_REST_Request $request Full details about the request.
 	 * @return array
 	 */
 	protected function prepare_objects_query( $request ) {
-		// This is needed to get around an array to string notice in WC_REST_Orders_Controller::prepare_objects_query.
+		// This is needed to get around an array to string notice in WC_REST_Orders_V2_Controller::prepare_objects_query.
 		$statuses = $request['status'];
 		unset( $request['status'] );
 		$args = parent::prepare_objects_query( $request );
@@ -228,6 +303,9 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 			}
 		}
 
+		// Put the statuses back for further processing (next/prev links, etc).
+		$request['status'] = $statuses;
+
 		return $args;
 	}
 
@@ -240,6 +318,13 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 		$schema = parent::get_item_schema();
 
 		$schema['properties']['coupon_lines']['items']['properties']['discount']['readonly'] = true;
+
+        $schema['properties']['manual_update'] = array(
+			'default'     => false,
+			'description' => __( 'Set the action as manual so that the order note registers as "added by user".', 'classic-commerce' ),
+			'type'        => 'boolean',
+			'context'     => array( 'edit' ),
+		);
 
 		return $schema;
 	}
@@ -254,7 +339,7 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 
 		$params['status'] = array(
 			'default'           => 'any',
-			'description'       => __( 'Limit result set to orders assigned a specific status.', 'classic-commerce' ),
+			'description'       => __( 'Limit result set to orders which have specific statuses.', 'classic-commerce' ),
 			'type'              => 'array',
 			'items'             => array(
 				'type' => 'string',

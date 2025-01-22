@@ -6,7 +6,7 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates/Emails
- * @version WC-3.5.0
+ * @version WC-3.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -23,7 +23,7 @@ do_action( 'woocommerce_email_header', $email_heading, $email ); ?>
 <?php /* translators: %s: Customer first name */ ?>
 <p><?php printf( esc_html__( 'Hi %s,', 'classic-commerce' ), esc_html( $order->get_billing_first_name() ) ); ?></p>
 
-<?php if ( $order->has_status( 'pending' ) ) { ?>
+<?php if ( $order->needs_payment() ) { ?>
 	<p>
 	<?php
 	printf(
@@ -45,11 +45,11 @@ do_action( 'woocommerce_email_header', $email_heading, $email ); ?>
 <?php } else { ?>
 	<p>
 	<?php
-		/* translators: %s Order date */
-		printf( esc_html__( 'Here are the details of your order placed on %s:', 'classic-commerce' ), esc_html( wc_format_datetime( $order->get_date_created() ) ) );
-	?>
-	</p>
-<?php
+    /* translators: %s Order date */
+	printf( esc_html__( 'Here are the details of your order placed on %s:', 'classic-commerce' ), esc_html( wc_format_datetime( $order->get_date_created() ) ) );
+    ?>
+    </p>
+    <?php
 }
 
 /**
@@ -77,11 +77,12 @@ do_action( 'woocommerce_email_order_meta', $order, $sent_to_admin, $plain_text, 
  */
 do_action( 'woocommerce_email_customer_details', $order, $sent_to_admin, $plain_text, $email );
 
-?>
-<p>
-<?php esc_html_e( 'Thanks for reading.', 'classic-commerce' ); ?>
-</p>
-<?php
+/**
+ * Show user-defined additonal content - this is set in each email's settings.
+ */
+if ( $additional_content ) {
+	echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) );
+}
 
 /**
  * Executes the email footer.

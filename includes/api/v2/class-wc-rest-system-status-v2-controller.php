@@ -4,8 +4,8 @@
  *
  * Handles requests to the /system_status endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * System status controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Controller
  */
 class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
@@ -71,21 +71,9 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 	 * @return WP_Error|WP_REST_Response
 	 */
 	public function get_items( $request ) {
-		$schema   = $this->get_item_schema();
-		$mappings = $this->get_item_mappings();
-		$response = array();
-
-		foreach ( $mappings as $section => $values ) {
-			foreach ( $values as $key => $value ) {
-				if ( isset( $schema['properties'][ $section ]['properties'][ $key ]['type'] ) ) {
-					settype( $values[ $key ], $schema['properties'][ $section ]['properties'][ $key ]['type'] );
-				}
-			}
-			settype( $values, $schema['properties'][ $section ]['type'] );
-			$response[ $section ] = $values;
-		}
-
-		$response = $this->prepare_item_for_response( $response, $request );
+		$fields   = $this->get_fields_for_response( $request );
+		$mappings = $this->get_item_mappings_per_fields( $fields );
+		$response = $this->prepare_item_for_response( $mappings, $request );
 
 		return rest_ensure_response( $response );
 	}
@@ -101,7 +89,7 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 			'title'      => 'system_status',
 			'type'       => 'object',
 			'properties' => array(
-				'environment'    => array(
+				'environment'        => array(
 					'description' => __( 'Environment.', 'classic-commerce' ),
 					'type'        => 'object',
 					'context'     => array( 'view' ),
@@ -121,8 +109,8 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 							'context'     => array( 'view' ),
 							'readonly'    => true,
 						),
-						'wc_version'                => array(
-							'description' => __( 'Classic Commerce version.', 'classic-commerce' ),
+						'version'                   => array(
+							'description' => __( 'WooCommerce version.', 'classic-commerce' ),
 							'type'        => 'string',
 							'context'     => array( 'view' ),
 							'readonly'    => true,
@@ -229,7 +217,7 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 							'context'     => array( 'view' ),
 							'readonly'    => true,
 						),
-						'mysql_version_string'             => array(
+						'mysql_version_string'      => array(
 							'description' => __( 'MySQL version string.', 'classic-commerce' ),
 							'type'        => 'string',
 							'context'     => array( 'view' ),
@@ -297,7 +285,7 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 						),
 					),
 				),
-				'database'       => array(
+				'database'           => array(
 					'description' => __( 'Database.', 'classic-commerce' ),
 					'type'        => 'object',
 					'context'     => array( 'view' ),
@@ -332,7 +320,7 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 						),
 					),
 				),
-				'active_plugins' => array(
+				'active_plugins'     => array(
 					'description' => __( 'Active plugins.', 'classic-commerce' ),
 					'type'        => 'array',
 					'context'     => array( 'view' ),
@@ -341,7 +329,25 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 						'type' => 'string',
 					),
 				),
-				'theme'          => array(
+				'inactive_plugins'   => array(
+					'description' => __( 'Inactive plugins.', 'classic-commerce' ),
+					'type'        => 'array',
+					'context'     => array( 'view' ),
+					'readonly'    => true,
+					'items'       => array(
+						'type' => 'string',
+					),
+				),
+				'dropins_mu_plugins' => array(
+					'description' => __( 'Dropins & MU plugins.', 'classic-commerce' ),
+					'type'        => 'array',
+					'context'     => array( 'view' ),
+					'readonly'    => true,
+					'items'       => array(
+						'type' => 'string',
+					),
+				),
+				'theme'              => array(
 					'description' => __( 'Theme.', 'classic-commerce' ),
 					'type'        => 'object',
 					'context'     => array( 'view' ),
@@ -355,12 +361,6 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 						),
 						'version'                 => array(
 							'description' => __( 'Theme version.', 'classic-commerce' ),
-							'type'        => 'string',
-							'context'     => array( 'view' ),
-							'readonly'    => true,
-						),
-						'version_latest'          => array(
-							'description' => __( 'Latest version of theme.', 'classic-commerce' ),
 							'type'        => 'string',
 							'context'     => array( 'view' ),
 							'readonly'    => true,
@@ -385,7 +385,7 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 							'readonly'    => true,
 						),
 						'has_woocommerce_file'    => array(
-							'description' => __( 'Does the theme have a woocommerce.php file?', 'classic-commerce' ),
+							'description' => __( 'Does the theme have a classic-commerce.php file?', 'classic-commerce' ),
 							'type'        => 'boolean',
 							'context'     => array( 'view' ),
 							'readonly'    => true,
@@ -426,14 +426,14 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 						),
 					),
 				),
-				'settings'       => array(
+				'settings'           => array(
 					'description' => __( 'Settings.', 'classic-commerce' ),
 					'type'        => 'object',
 					'context'     => array( 'view' ),
 					'readonly'    => true,
 					'properties'  => array(
 						'api_enabled'              => array(
-							'description' => __( 'REST API enabled?', 'classic-commerce' ),
+							'description' => __( 'Legacy REST API enabled?', 'classic-commerce' ),
 							'type'        => 'boolean',
 							'context'     => array( 'view' ),
 							'readonly'    => true,
@@ -506,7 +506,7 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 						),
 					),
 				),
-				'security'       => array(
+				'security'           => array(
 					'description' => __( 'Security.', 'classic-commerce' ),
 					'type'        => 'object',
 					'context'     => array( 'view' ),
@@ -526,8 +526,17 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 						),
 					),
 				),
-				'pages'          => array(
+				'pages'              => array(
 					'description' => __( 'Classic Commerce pages.', 'classic-commerce' ),
+					'type'        => 'array',
+					'context'     => array( 'view' ),
+					'readonly'    => true,
+					'items'       => array(
+						'type' => 'string',
+					),
+				),
+				'post_type_counts'   => array(
+					'description' => __( 'Total post count.', 'classic-commerce' ),
 					'type'        => 'array',
 					'context'     => array( 'view' ),
 					'readonly'    => true,
@@ -544,17 +553,43 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 	/**
 	 * Return an array of sections and the data associated with each.
 	 *
+	 * @deprecated 3.9.0
 	 * @return array
 	 */
 	public function get_item_mappings() {
 		return array(
-			'environment'    => $this->get_environment_info(),
-			'database'       => $this->get_database_info(),
-			'active_plugins' => $this->get_active_plugins(),
-			'theme'          => $this->get_theme_info(),
-			'settings'       => $this->get_settings(),
-			'security'       => $this->get_security_info(),
-			'pages'          => $this->get_pages(),
+			'environment'        => $this->get_environment_info(),
+			'database'           => $this->get_database_info(),
+			'active_plugins'     => $this->get_active_plugins(),
+			'inactive_plugins'   => $this->get_inactive_plugins(),
+			'dropins_mu_plugins' => $this->get_dropins_mu_plugins(),
+			'theme'              => $this->get_theme_info(),
+			'settings'           => $this->get_settings(),
+			'security'           => $this->get_security_info(),
+			'pages'              => $this->get_pages(),
+			'post_type_counts'   => $this->get_post_type_counts(),
+		);
+	}
+
+	/**
+	 * Return an array of sections and the data associated with each.
+	 *
+	 * @since 3.9.0
+	 * @param array $fields List of fields to be included on the response.
+	 * @return array
+	 */
+	public function get_item_mappings_per_fields( $fields ) {
+		return array(
+			'environment'        => $this->get_environment_info_per_fields( $fields ),
+			'database'           => $this->get_database_info(),
+			'active_plugins'     => $this->get_active_plugins(),
+			'inactive_plugins'   => $this->get_inactive_plugins(),
+			'dropins_mu_plugins' => $this->get_dropins_mu_plugins(),
+			'theme'              => $this->get_theme_info(),
+			'settings'           => $this->get_settings(),
+			'security'           => $this->get_security_info(),
+			'pages'              => $this->get_pages(),
+			'post_type_counts'   => $this->get_post_type_counts(),
 		);
 	}
 
@@ -562,46 +597,111 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 	 * Get array of environment information. Includes thing like software
 	 * versions, and various server settings.
 	 *
+	 * @deprecated 3.9.0
 	 * @return array
 	 */
 	public function get_environment_info() {
+		return $this->get_environment_info_per_fields( array( 'environment' ) );
+	}
+
+	/**
+	 * Check if field item exists.
+	 *
+	 * @since 3.9.0
+	 * @param string $section Fields section.
+	 * @param array  $items List of items to check for.
+	 * @param array  $fields List of fields to be included on the response.
+	 * @return bool
+	 */
+	private function check_if_field_item_exists( $section, $items, $fields ) {
+		if ( ! in_array( $section, $fields, true ) ) {
+			return false;
+		}
+
+		$exclude = array();
+		foreach ( $fields as $field ) {
+			$values = explode( '.', $field );
+
+			if ( $section !== $values[0] || empty( $values[1] ) ) {
+				continue;
+			}
+
+			$exclude[] = $values[1];
+		}
+
+		return 0 <= count( array_intersect( $items, $exclude ) );
+	}
+
+	/**
+	 * Get array of environment information. Includes thing like software
+	 * versions, and various server settings.
+	 *
+	 * @param array $fields List of fields to be included on the response.
+	 * @return array
+	 */
+	public function get_environment_info_per_fields( $fields ) {
 		global $wpdb;
+
+		$enable_remote_post = $this->check_if_field_item_exists( 'environment', array( 'remote_post_successful', 'remote_post_response' ), $fields );
+		$enable_remote_get  = $this->check_if_field_item_exists( 'environment', array( 'remote_get_successful', 'remote_get_response' ), $fields );
 
 		// Figure out cURL version, if installed.
 		$curl_version = '';
 		if ( function_exists( 'curl_version' ) ) {
 			$curl_version = curl_version();
 			$curl_version = $curl_version['version'] . ', ' . $curl_version['ssl_version'];
+		} elseif ( extension_loaded( 'curl' ) ) {
+			$curl_version = __( 'cURL installed but unable to retrieve version.', 'classic-commerce' );
 		}
 
 		// WP memory limit.
 		$wp_memory_limit = wc_let_to_num( WP_MEMORY_LIMIT );
 		if ( function_exists( 'memory_get_usage' ) ) {
-			$wp_memory_limit = max( $wp_memory_limit, wc_let_to_num( @ini_get( 'memory_limit' ) ) );
+			$wp_memory_limit = max( $wp_memory_limit, wc_let_to_num( @ini_get( 'memory_limit' ) ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		}
 
 		// Test POST requests.
-		$post_response            = wp_safe_remote_post(
-			'https://www.paypal.com/cgi-bin/webscr',
-			array(
-				'timeout'     => 10,
-				'user-agent'  => WooCommerce::user_agent_header(),
-				'httpversion' => '1.1',
-				'body'        => array(
-					'cmd' => '_notify-validate',
-				),
-			)
-		);
-		$post_response_successful = false;
-		if ( ! is_wp_error( $post_response ) && $post_response['response']['code'] >= 200 && $post_response['response']['code'] < 300 ) {
-			$post_response_successful = true;
+		$post_response_successful = null;
+		$post_response_code       = null;
+		if ( $enable_remote_post ) {
+			$post_response_code = get_transient( 'woocommerce_test_remote_post' );
+
+			if ( false === $post_response_code || is_wp_error( $post_response_code ) ) {
+				$response = wp_safe_remote_post(
+					'https://www.paypal.com/cgi-bin/webscr',
+					array(
+						'timeout'     => 10,
+						'user-agent'  => 'WooCommerce/' . WC()->version,
+						'httpversion' => '1.1',
+						'body'        => array(
+							'cmd' => '_notify-validate',
+						),
+					)
+				);
+				if ( ! is_wp_error( $response ) ) {
+					$post_response_code = $response['response']['code'];
+				}
+				set_transient( 'woocommerce_test_remote_post', $post_response_code, HOUR_IN_SECONDS );
+			}
+
+			$post_response_successful = ! is_wp_error( $post_response_code ) && $post_response_code >= 200 && $post_response_code < 300;
 		}
 
 		// Test GET requests.
-		$get_response            = wp_safe_remote_get( 'https://woocommerce.com/wc-api/product-key-api?request=ping&network=' . ( is_multisite() ? '1' : '0' ) );
-		$get_response_successful = false;
-		if ( ! is_wp_error( $post_response ) && $post_response['response']['code'] >= 200 && $post_response['response']['code'] < 300 ) {
-			$get_response_successful = true;
+		$get_response_successful = null;
+		$get_response_code       = null;
+		if ( $enable_remote_get ) {
+			$get_response_code = get_transient( 'woocommerce_test_remote_get' );
+
+			if ( false === $get_response_code || is_wp_error( $get_response_code ) ) {
+				$response = wp_safe_remote_get( 'https://woocommerce.com/wc-api/product-key-api?request=ping&network=' . ( is_multisite() ? '1' : '0' ) );
+				if ( ! is_wp_error( $response ) ) {
+					$get_response_code = $response['response']['code'];
+				}
+				set_transient( 'woocommerce_test_remote_get', $get_response_code, HOUR_IN_SECONDS );
+			}
+
+			$get_response_successful = ! is_wp_error( $get_response_code ) && $get_response_code >= 200 && $get_response_code < 300;
 		}
 
 		$database_version = wc_get_server_database_version();
@@ -613,7 +713,7 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 			'version'                   => WC()->version,
 			'cc_version'                => WC()->cc_version,
 			'log_directory'             => WC_LOG_DIR,
-			'log_directory_writable'    => (bool) @fopen( WC_LOG_DIR . 'test-log.log', 'a' ),
+			'log_directory_writable'    => (bool) @fopen( WC_LOG_DIR . 'test-log.log', 'a' ), // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_read_fopen
 			'wp_version'                => get_bloginfo( 'version' ),
 			'wp_multisite'              => is_multisite(),
 			'wp_memory_limit'           => $wp_memory_limit,
@@ -624,8 +724,8 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 			'server_info'               => isset( $_SERVER['SERVER_SOFTWARE'] ) ? wc_clean( wp_unslash( $_SERVER['SERVER_SOFTWARE'] ) ) : '',
 			'php_version'               => phpversion(),
 			'php_post_max_size'         => wc_let_to_num( ini_get( 'post_max_size' ) ),
-			'php_max_execution_time'    => ini_get( 'max_execution_time' ),
-			'php_max_input_vars'        => ini_get( 'max_input_vars' ),
+			'php_max_execution_time'    => (int) ini_get( 'max_execution_time' ),
+			'php_max_input_vars'        => (int) ini_get( 'max_input_vars' ),
 			'curl_version'              => $curl_version,
 			'suhosin_installed'         => extension_loaded( 'suhosin' ),
 			'max_upload_size'           => wp_max_upload_size(),
@@ -638,9 +738,9 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 			'gzip_enabled'              => is_callable( 'gzopen' ),
 			'mbstring_enabled'          => extension_loaded( 'mbstring' ),
 			'remote_post_successful'    => $post_response_successful,
-			'remote_post_response'      => ( is_wp_error( $post_response ) ? $post_response->get_error_message() : $post_response['response']['code'] ),
+			'remote_post_response'      => is_wp_error( $post_response_code ) ? $post_response_code->get_error_message() : $post_response_code,
 			'remote_get_successful'     => $get_response_successful,
-			'remote_get_response'       => ( is_wp_error( $get_response ) ? $get_response->get_error_message() : $get_response['response']['code'] ),
+			'remote_get_response'       => is_wp_error( $get_response_code ) ? $get_response_code->get_error_message() : $get_response_code,
 		);
 	}
 
@@ -663,89 +763,94 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 	public function get_database_info() {
 		global $wpdb;
 
-		$database_table_sizes = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT
-				    table_name AS 'name',
-				    round( ( data_length / 1024 / 1024 ), 2 ) 'data',
-				    round( ( index_length / 1024 / 1024 ), 2 ) 'index'
-				FROM information_schema.TABLES
-				WHERE table_schema = %s
-				ORDER BY name ASC;",
-				DB_NAME
-			)
-		);
+		$tables        = array();
+		$database_size = array();
 
-		// WC Core tables to check existence of.
-		$core_tables = apply_filters(
-			'woocommerce_database_tables',
-			array(
-				'woocommerce_sessions',
-				'woocommerce_api_keys',
-				'woocommerce_attribute_taxonomies',
-				'woocommerce_downloadable_product_permissions',
-				'woocommerce_order_items',
-				'woocommerce_order_itemmeta',
-				'woocommerce_tax_rates',
-				'woocommerce_tax_rate_locations',
-				'woocommerce_shipping_zones',
-				'woocommerce_shipping_zone_locations',
-				'woocommerce_shipping_zone_methods',
-				'woocommerce_payment_tokens',
-				'woocommerce_payment_tokenmeta',
-				'woocommerce_log',
-			)
-		);
-
-		if ( get_option( 'db_version' ) < 34370 ) {
-			$core_tables[] = 'woocommerce_termmeta';
-		}
-
-		/**
-		 * Adding the prefix to the tables array, for backwards compatibility.
-		 *
-		 * If we changed the tables above to include the prefix, then any filters against that table could break.
-		 */
-		$core_tables = array_map( array( $this, 'add_db_table_prefix' ), $core_tables );
-
-		/**
-		 * Organize Classic Commerce and non-Classic Commerce tables separately for display purposes later.
-		 *
-		 * To ensure we include all WC tables, even if they do not exist, pre-populate the WC array with all the tables.
-		 */
-		$tables = array(
-			'woocommerce' => array_fill_keys( $core_tables, false ),
-			'other'       => array(),
-		);
-
-		$database_size = array(
-			'data'  => 0,
-			'index' => 0,
-		);
-
-		$site_tables_prefix = $wpdb->get_blog_prefix( get_current_blog_id() );
-		$global_tables = $wpdb->tables( 'global', true );
-		foreach ( $database_table_sizes as $table ) {
-			// Only include tables matching the prefix of the current site, this is to prevent displaying all tables on a MS install not relating to the current.
-			if ( is_multisite() && 0 !== strpos( $table->name, $site_tables_prefix ) && ! in_array( $table->name, $global_tables, true ) ) {
-				continue;
-			}
-			$table_type = in_array( $table->name, $core_tables ) ? 'woocommerce' : 'other';
-
-			$tables[ $table_type ][ $table->name ] = array(
-				'data'  => $table->data,
-				'index' => $table->index,
+		// It is not possible to get the database name from some classes that replace wpdb (e.g., HyperDB)
+		// and that is why this if condition is needed.
+		if ( defined( 'DB_NAME' ) ) {
+			$database_table_information = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT
+					    table_name AS 'name',
+						engine AS 'engine',
+					    round( ( data_length / 1024 / 1024 ), 2 ) 'data',
+					    round( ( index_length / 1024 / 1024 ), 2 ) 'index'
+					FROM information_schema.TABLES
+					WHERE table_schema = %s
+					ORDER BY name ASC;",
+					DB_NAME
+				)
 			);
 
-			$database_size['data']  += $table->data;
-			$database_size['index'] += $table->index;
+			// WC Core tables to check existence of.
+			$core_tables = apply_filters(
+				'woocommerce_database_tables',
+				array(
+					'woocommerce_sessions',
+					'woocommerce_api_keys',
+					'woocommerce_attribute_taxonomies',
+					'woocommerce_downloadable_product_permissions',
+					'woocommerce_order_items',
+					'woocommerce_order_itemmeta',
+					'woocommerce_tax_rates',
+					'woocommerce_tax_rate_locations',
+					'woocommerce_shipping_zones',
+					'woocommerce_shipping_zone_locations',
+					'woocommerce_shipping_zone_methods',
+					'woocommerce_payment_tokens',
+					'woocommerce_payment_tokenmeta',
+					'woocommerce_log',
+				)
+			);
+
+			/**
+			 * Adding the prefix to the tables array, for backwards compatibility.
+			 *
+			 * If we changed the tables above to include the prefix, then any filters against that table could break.
+			 */
+			$core_tables = array_map( array( $this, 'add_db_table_prefix' ), $core_tables );
+
+			/**
+			 * Organize WooCommerce and non-WooCommerce tables separately for display purposes later.
+			 *
+			 * To ensure we include all WC tables, even if they do not exist, pre-populate the WC array with all the tables.
+			 */
+			$tables = array(
+				'woocommerce' => array_fill_keys( $core_tables, false ),
+				'other'       => array(),
+			);
+
+			$database_size = array(
+				'data'  => 0,
+				'index' => 0,
+			);
+
+			$site_tables_prefix = $wpdb->get_blog_prefix( get_current_blog_id() );
+			$global_tables      = $wpdb->tables( 'global', true );
+			foreach ( $database_table_information as $table ) {
+				// Only include tables matching the prefix of the current site, this is to prevent displaying all tables on a MS install not relating to the current.
+				if ( is_multisite() && 0 !== strpos( $table->name, $site_tables_prefix ) && ! in_array( $table->name, $global_tables, true ) ) {
+					continue;
+				}
+				$table_type = in_array( $table->name, $core_tables, true ) ? 'woocommerce' : 'other';
+
+				$tables[ $table_type ][ $table->name ] = array(
+					'data'   => $table->data,
+					'index'  => $table->index,
+					'engine' => $table->engine,
+				);
+
+				$database_size['data']  += $table->data;
+				$database_size['index'] += $table->index;
+			}
 		}
 
 		// Return all database info. Described by JSON Schema.
 		return array(
 			'wc_database_version'    => get_option( 'woocommerce_db_version' ),
 			'database_prefix'        => $wpdb->prefix,
-			'maxmind_geoip_database' => WC_Geolocation::get_local_database_path(),
+			'maxmind_geoip_database' => '',
 			'database_tables'        => $tables,
 			'database_size'          => $database_size,
 		);
@@ -771,13 +876,11 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 	 */
 	public function get_active_plugins() {
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		require_once ABSPATH . 'wp-admin/includes/update.php';
 
-		if ( ! function_exists( 'get_plugin_updates' ) ) {
+		if ( ! function_exists( 'get_plugin_data' ) ) {
 			return array();
 		}
 
-		// Get both site plugins and network plugins.
 		$active_plugins = (array) get_option( 'active_plugins', array() );
 		if ( is_multisite() ) {
 			$network_activated_plugins = array_keys( get_site_option( 'active_sitewide_plugins', array() ) );
@@ -785,81 +888,116 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 		}
 
 		$active_plugins_data = array();
-		$available_updates   = get_plugin_updates();
 
 		foreach ( $active_plugins as $plugin ) {
-			$data           = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin );
-			$dirname        = dirname( $plugin );
-			$version_latest = '';
-			$slug           = explode( '/', $plugin );
-			$slug           = explode( '.', end( $slug ) );
-			$slug           = $slug[0];
-
-			if ( 'woocommerce' !== $slug && ( strstr( $data['PluginURI'], 'woothemes.com' ) || strstr( $data['PluginURI'], 'woocommerce.com' ) ) ) {
-				$version_data = get_transient( md5( $plugin ) . '_version_data' );
-				if ( false === $version_data ) {
-					$changelog = wp_safe_remote_get( 'http://dzv365zjfbd8v.cloudfront.net/changelogs/' . $dirname . '/changelog.txt' );
-					if ( 200 === wp_remote_retrieve_response_code( $changelog ) ) {
-						$cl_lines = explode( "\n", wp_remote_retrieve_body( $changelog ) );
-						if ( ! empty( $cl_lines ) ) {
-							foreach ( $cl_lines as $line_num => $cl_line ) {
-								if ( preg_match( '/^[0-9]/', $cl_line ) ) {
-									$date         = str_replace( '.', '-', trim( substr( $cl_line, 0, strpos( $cl_line, '-' ) ) ) );
-									$version      = preg_replace( '~[^0-9,.]~', '', stristr( $cl_line, 'version' ) );
-									$update       = trim( str_replace( '*', '', $cl_lines[ $line_num + 1 ] ) );
-									$version_data = array(
-										'date'      => $date,
-										'version'   => $version,
-										'update'    => $update,
-										'changelog' => $changelog,
-									);
-									set_transient( md5( $plugin ) . '_version_data', $version_data, DAY_IN_SECONDS );
-									break;
-								}
-							}
-						}
-					} else {
-						$args    = (object) array(
-							'slug' => $dirname,
-						);
-						$request = array(
-							'action'  => 'plugin_information',
-							'request' => serialize( $args ),
-						);
-						$plugin_info = wp_safe_remote_post( 'http://api.wordpress.org/plugins/info/1.0/', array( 'body' => $request ) );
-						if ( 200 === wp_remote_retrieve_response_code( $plugin_info ) ) {
-							$body = maybe_unserialize( wp_remote_retrieve_body( $plugin_info ) );
-							if ( is_object( $body ) && isset( $body->sections['changelog'] ) ) {
-								$version_data = array(
-									'date'      => $body->last_updated,
-									'version'   => $body->version,
-									'update'    => $body->sections['changelog'],
-									'changelog' => $body->sections['changelog'],
-								);
-								set_transient( md5( $plugin ) . '_version_data', $version_data, DAY_IN_SECONDS );
-							}
-						}
-					}
-				}
-				$version_latest = $version_data['version'];
-			} elseif ( isset( $available_updates[ $plugin ]->update->new_version ) ) {
-				$version_latest = $available_updates[ $plugin ]->update->new_version;
-			}
-
-			// convert plugin data to json response format.
-			$active_plugins_data[] = array(
-				'plugin'            => $plugin,
-				'name'              => $data['Name'],
-				'version'           => $data['Version'],
-				'version_latest'    => $version_latest,
-				'url'               => $data['PluginURI'],
-				'author_name'       => $data['AuthorName'],
-				'author_url'        => esc_url_raw( $data['AuthorURI'] ),
-				'network_activated' => $data['Network'],
-			);
+			$data                  = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin );
+			$active_plugins_data[] = $this->format_plugin_data( $plugin, $data );
 		}
 
 		return $active_plugins_data;
+	}
+
+	/**
+	 * Get a list of inplugins active on the site.
+	 *
+	 * @return array
+	 */
+	public function get_inactive_plugins() {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+		if ( ! function_exists( 'get_plugins' ) ) {
+			return array();
+		}
+
+		$plugins        = get_plugins();
+		$active_plugins = (array) get_option( 'active_plugins', array() );
+
+		if ( is_multisite() ) {
+			$network_activated_plugins = array_keys( get_site_option( 'active_sitewide_plugins', array() ) );
+			$active_plugins            = array_merge( $active_plugins, $network_activated_plugins );
+		}
+
+		$plugins_data = array();
+
+		foreach ( $plugins as $plugin => $data ) {
+			if ( in_array( $plugin, $active_plugins, true ) ) {
+				continue;
+			}
+			$plugins_data[] = $this->format_plugin_data( $plugin, $data );
+		}
+
+		return $plugins_data;
+	}
+
+	/**
+	 * Format plugin data, including data on updates, into a standard format.
+	 *
+	 * @since 3.6.0
+	 * @param string $plugin Plugin directory/file.
+	 * @param array  $data Plugin data from WP.
+	 * @return array Formatted data.
+	 */
+	protected function format_plugin_data( $plugin, $data ) {
+		require_once ABSPATH . 'wp-admin/includes/update.php';
+
+		if ( ! function_exists( 'get_plugin_updates' ) ) {
+			return array();
+		}
+
+		// Use WP API to lookup latest updates for plugins. WC_Helper injects updates for premium plugins.
+		if ( empty( $this->available_updates ) ) {
+			$this->available_updates = get_plugin_updates();
+		}
+
+		$version_latest = $data['Version'];
+
+		// Find latest version.
+		if ( isset( $this->available_updates[ $plugin ]->update->new_version ) ) {
+			$version_latest = $this->available_updates[ $plugin ]->update->new_version;
+		}
+
+		return array(
+			'plugin'            => $plugin,
+			'name'              => $data['Name'],
+			'version'           => $data['Version'],
+			'url'               => $data['PluginURI'],
+			'author_name'       => $data['AuthorName'],
+			'author_url'        => esc_url_raw( $data['AuthorURI'] ),
+			'network_activated' => $data['Network'],
+		);
+	}
+
+	/**
+	 * Get a list of Dropins and MU plugins.
+	 *
+	 * @since 3.6.0
+	 * @return array
+	 */
+	public function get_dropins_mu_plugins() {
+		$dropins = get_dropins();
+		$plugins = array(
+			'dropins'    => array(),
+			'mu_plugins' => array(),
+		);
+		foreach ( $dropins as $key => $dropin ) {
+			$plugins['dropins'][] = array(
+				'plugin' => $key,
+				'name'   => $dropin['Name'],
+			);
+		}
+
+		$mu_plugins = get_mu_plugins();
+		foreach ( $mu_plugins as $plugin => $mu_plugin ) {
+			$plugins['mu_plugins'][] = array(
+				'plugin'      => $plugin,
+				'name'        => $mu_plugin['Name'],
+				'version'     => $mu_plugin['Version'],
+				'url'         => $mu_plugin['PluginURI'],
+				'author_name' => $mu_plugin['AuthorName'],
+				'author_url'  => esc_url_raw( $mu_plugin['AuthorURI'] ),
+			);
+		}
+		return $plugins;
 	}
 
 	/**
@@ -878,14 +1016,12 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 			$parent_theme_info = array(
 				'parent_name'           => $parent_theme->name,
 				'parent_version'        => $parent_theme->version,
-				'parent_version_latest' => WC_Admin_Status::get_latest_theme_version( $parent_theme ),
 				'parent_author_url'     => $parent_theme->{'Author URI'},
 			);
 		} else {
 			$parent_theme_info = array(
 				'parent_name'           => '',
 				'parent_version'        => '',
-				'parent_version_latest' => '',
 				'parent_author_url'     => '',
 			);
 		}
@@ -897,6 +1033,12 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 		$override_files     = array();
 		$outdated_templates = false;
 		$scan_files         = WC_Admin_Status::scan_template_files( WC()->plugin_path() . '/templates/' );
+
+		// Include *-product_<cat|tag> templates for backwards compatibility.
+		$scan_files[] = 'content-product_cat.php';
+		$scan_files[] = 'taxonomy-product_cat.php';
+		$scan_files[] = 'taxonomy-product_tag.php';
+
 		foreach ( $scan_files as $file ) {
 			$located = apply_filters( 'wc_get_template', $file, $file, array(), WC()->template_path(), WC()->plugin_path() . '/templates/' );
 
@@ -915,7 +1057,14 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 			}
 
 			if ( ! empty( $theme_file ) ) {
-				$core_version  = WC_Admin_Status::get_file_version( WC()->plugin_path() . '/templates/' . $file );
+				$core_file = $file;
+
+				// Update *-product_<cat|tag> template name before searching in core.
+				if ( false !== strpos( $core_file, '-product_cat' ) || false !== strpos( $core_file, '-product_tag' ) ) {
+					$core_file = str_replace( '_', '-', $core_file );
+				}
+
+				$core_version  = WC_Admin_Status::get_file_version( WC()->plugin_path() . '/templates/' . $core_file );
 				$theme_version = WC_Admin_Status::get_file_version( $theme_file );
 				if ( $core_version && ( empty( $theme_version ) || version_compare( $theme_version, $core_version, '<' ) ) ) {
 					if ( ! $outdated_templates ) {
@@ -933,7 +1082,6 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 		$active_theme_info = array(
 			'name'                    => $active_theme->name,
 			'version'                 => $active_theme->version,
-			'version_latest'          => WC_Admin_Status::get_latest_theme_version( $active_theme ),
 			'author_url'              => esc_url_raw( $active_theme->{'Author URI'} ),
 			'is_child_theme'          => is_child_theme(),
 			'has_woocommerce_support' => current_theme_supports( 'woocommerce' ),
@@ -968,17 +1116,17 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 
 		// Return array of useful settings for debugging.
 		return array(
-			'api_enabled'              => 'yes' === get_option( 'woocommerce_api_enabled' ),
-			'force_ssl'                => 'yes' === get_option( 'woocommerce_force_ssl_checkout' ),
-			'currency'                 => get_woocommerce_currency(),
-			'currency_symbol'          => get_woocommerce_currency_symbol(),
-			'currency_position'        => get_option( 'woocommerce_currency_pos' ),
-			'thousand_separator'       => wc_get_price_thousand_separator(),
-			'decimal_separator'        => wc_get_price_decimal_separator(),
-			'number_of_decimals'       => wc_get_price_decimals(),
-			'geolocation_enabled'      => in_array( get_option( 'woocommerce_default_customer_address' ), array( 'geolocation_ajax', 'geolocation' ) ),
-			'taxonomies'               => $term_response,
-			'product_visibility_terms' => $product_visibility_terms,
+			'api_enabled'               => 'yes' === get_option( 'woocommerce_api_enabled' ),
+			'force_ssl'                 => 'yes' === get_option( 'woocommerce_force_ssl_checkout' ),
+			'currency'                  => get_woocommerce_currency(),
+			'currency_symbol'           => get_woocommerce_currency_symbol(),
+			'currency_position'         => get_option( 'woocommerce_currency_pos' ),
+			'thousand_separator'        => wc_get_price_thousand_separator(),
+			'decimal_separator'         => wc_get_price_decimal_separator(),
+			'number_of_decimals'        => wc_get_price_decimals(),
+			'geolocation_enabled'       => in_array( get_option( 'woocommerce_default_customer_address' ), array( 'geolocation_ajax', 'geolocation' ), true ),
+			'taxonomies'                => $term_response,
+			'product_visibility_terms'  => $product_visibility_terms,
 		);
 	}
 
@@ -988,7 +1136,7 @@ class WC_REST_System_Status_V2_Controller extends WC_REST_Controller {
 	 * @return array
 	 */
 	public function get_security_info() {
-		$check_page = 0 < wc_get_page_id( 'shop' ) ? get_permalink( wc_get_page_id( 'shop' ) ) : get_home_url();
+		$check_page = wc_get_page_permalink( 'shop' );
 		return array(
 			'secure_connection' => 'https' === substr( $check_page, 0, 5 ),
 			'hide_errors'       => ! ( defined( 'WP_DEBUG' ) && defined( 'WP_DEBUG_DISPLAY' ) && WP_DEBUG && WP_DEBUG_DISPLAY ) || 0 === intval( ini_get( 'display_errors' ) ),

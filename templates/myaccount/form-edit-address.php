@@ -6,12 +6,12 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates
- * @version WC-3.4.0
+ * @version WC-9.3.0
  */
 
 defined( 'ABSPATH' ) || exit;
 
-$page_title = ( 'billing' === $load_address ) ? __( 'Billing address', 'classic-commerce' ) : __( 'Shipping address', 'classic-commerce' );
+$page_title = ( 'billing' === $load_address ) ? __( 'Billing address', 'classic-commerce' ) : esc_html__( 'Shipping address', 'classic-commerce' );
 
 do_action( 'woocommerce_before_edit_account_address_form' ); ?>
 
@@ -21,7 +21,7 @@ do_action( 'woocommerce_before_edit_account_address_form' ); ?>
 
 	<form method="post">
 
-		<h3><?php echo apply_filters( 'woocommerce_my_account_edit_address_title', $page_title, $load_address ); ?></h3><?php // @codingStandardsIgnoreLine ?>
+		<h2><?php echo apply_filters( 'woocommerce_my_account_edit_address_title', $page_title, $load_address ); ?></h2><?php // @codingStandardsIgnoreLine ?>
 
 		<div class="woocommerce-address-fields">
 			<?php do_action( "woocommerce_before_edit_address_form_{$load_address}" ); ?>

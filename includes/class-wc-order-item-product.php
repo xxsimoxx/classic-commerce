@@ -7,12 +7,31 @@
  * @since   WC-3.0.0
  */
 
+use ClassicCommerce\Utilities\NumberUtil;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Order item product class.
  */
 class WC_Order_Item_Product extends WC_Order_Item {
+
+    
+	/**
+	 * Legacy values.
+	 *
+	 * @deprecated 4.4.0 For legacy actions.
+	 * @var array
+	 */
+	public $legacy_values;
+
+	/**
+	 * Legacy cart item key.
+	 *
+	 * @deprecated 4.4.0 For legacy actions.
+	 * @var string
+	 */
+	public $legacy_cart_item_key;
 
 	/**
 	 * Order Data array. This is the core order data exposed in APIs since 3.0.0.
@@ -155,13 +174,19 @@ class WC_Order_Item_Product extends WC_Order_Item {
 			$tax_data['total']    = array_map( 'wc_format_decimal', $raw_tax_data['total'] );
 
 			// Subtotal cannot be less than total!
-			if ( array_sum( $tax_data['subtotal'] ) < array_sum( $tax_data['total'] ) ) {
+			if ( NumberUtil::array_sum( $tax_data['subtotal'] ) < NumberUtil::array_sum( $tax_data['total'] ) ) {
 				$tax_data['subtotal'] = $tax_data['total'];
 			}
 		}
 		$this->set_prop( 'taxes', $tax_data );
-		$this->set_total_tax( array_sum( $tax_data['total'] ) );
-		$this->set_subtotal_tax( array_sum( $tax_data['subtotal'] ) );
+		
+        if ( 'yes' === get_option( 'woocommerce_tax_round_at_subtotal' ) ) {
+			$this->set_total_tax( NumberUtil::array_sum( $tax_data['total'] ) );
+			$this->set_subtotal_tax( NumberUtil::array_sum( $tax_data['subtotal'] ) );
+		} else {
+			$this->set_total_tax( NumberUtil::array_sum( array_map( 'wc_round_tax_total', $tax_data['total'] ) ) );
+			$this->set_subtotal_tax( NumberUtil::array_sum( array_map( 'wc_round_tax_total', $tax_data['subtotal'] ) ) );
+		}
 	}
 
 	/**
@@ -263,7 +288,8 @@ class WC_Order_Item_Product extends WC_Order_Item {
 	}
 
 	/**
-	 * Get subtotal.
+	 * Gets the item subtotal. This is the price of the item times the quantity
+	 * excluding taxes before coupon discounts.
 	 *
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return string
@@ -283,7 +309,8 @@ class WC_Order_Item_Product extends WC_Order_Item {
 	}
 
 	/**
-	 * Get total.
+	 * Gets the item total. This is the price of the item times the quantity
+	 * excluding taxes after coupon discounts.
 	 *
 	 * @param  string $context What the value is for. Valid values are 'view' and 'edit'.
 	 * @return string
@@ -347,7 +374,8 @@ class WC_Order_Item_Product extends WC_Order_Item {
 				'order'         => $order->get_order_key(),
 				'email'         => rawurlencode( $order->get_billing_email() ),
 				'key'           => $download_id,
-			), trailingslashit( home_url() )
+			),
+            trailingslashit( home_url() )
 		) : '';
 	}
 
@@ -361,9 +389,9 @@ class WC_Order_Item_Product extends WC_Order_Item {
 		$product    = $this->get_product();
 		$order      = $this->get_order();
 		$product_id = $this->get_variation_id() ? $this->get_variation_id() : $this->get_product_id();
-		$email_hash = function_exists( 'hash' ) ? hash( 'sha256', $order->get_billing_email() ) : sha1( $order->get_billing_email() );
 
 		if ( $product && $order && $product->is_downloadable() && $order->is_download_permitted() ) {
+            $email_hash         = function_exists( 'hash' ) ? hash( 'sha256', $order->get_billing_email() ) : sha1( $order->get_billing_email() );
 			$data_store         = WC_Data_Store::load( 'customer-download' );
 			$customer_downloads = $data_store->get_downloads(
 				array(
@@ -417,11 +445,11 @@ class WC_Order_Item_Product extends WC_Order_Item {
 	/**
 	 * OffsetGet for ArrayAccess/Backwards compatibility.
 	 *
-	 * @deprecated Add deprecation notices in future release.
 	 * @param      string $offset Offset.
 	 * @return     mixed
 	 */
-	public function offsetGet( $offset ) {
+    #[\ReturnTypeWillChange]
+	public function offsetGet( $offset ) : mixed {
 		if ( 'line_subtotal' === $offset ) {
 			$offset = 'subtotal';
 		} elseif ( 'line_subtotal_tax' === $offset ) {
@@ -441,11 +469,13 @@ class WC_Order_Item_Product extends WC_Order_Item {
 	/**
 	 * OffsetSet for ArrayAccess/Backwards compatibility.
 	 *
-	 * @deprecated Add deprecation notices in future release.
+	 * @deprecated 4.4.0.
 	 * @param      string $offset Offset.
 	 * @param      mixed  $value  Value.
 	 */
-	public function offsetSet( $offset, $value ) {
+    #[\ReturnTypeWillChange]
+	public function offsetSet( $offset, $value ) : void {
+        wc_deprecated_function( 'WC_Order_Item_Product::offsetSet', '4.4.0', '' );
 		if ( 'line_subtotal' === $offset ) {
 			$offset = 'subtotal';
 		} elseif ( 'line_subtotal_tax' === $offset ) {
@@ -468,7 +498,8 @@ class WC_Order_Item_Product extends WC_Order_Item {
 	 * @param string $offset Offset.
 	 * @return bool
 	 */
-	public function offsetExists( $offset ) {
+    #[\ReturnTypeWillChange]
+	public function offsetExists( $offset ) : bool {
 		if ( in_array( $offset, array( 'line_subtotal', 'line_subtotal_tax', 'line_total', 'line_tax', 'line_tax_data', 'item_meta_array', 'item_meta', 'qty' ), true ) ) {
 			return true;
 		}

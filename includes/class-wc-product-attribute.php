@@ -265,7 +265,8 @@ class WC_Product_Attribute implements ArrayAccess {
 	 * @param string $offset Offset.
 	 * @return mixed
 	 */
-	public function offsetGet( $offset ) {
+    #[\ReturnTypeWillChange]
+	public function offsetGet( $offset ) : mixed {
 		switch ( $offset ) {
 			case 'is_variation':
 				return $this->get_variation() ? 1 : 0;
@@ -290,7 +291,8 @@ class WC_Product_Attribute implements ArrayAccess {
 	 * @param string $offset Offset.
 	 * @param mixed  $value  Value.
 	 */
-	public function offsetSet( $offset, $value ) {
+    #[\ReturnTypeWillChange]
+	public function offsetSet( $offset, $value ) : void {
 		switch ( $offset ) {
 			case 'is_variation':
 				$this->set_variation( $value );
@@ -303,7 +305,7 @@ class WC_Product_Attribute implements ArrayAccess {
 				break;
 			default:
 				if ( is_callable( array( $this, "set_$offset" ) ) ) {
-					return $this->{"set_$offset"}( $value );
+					$this->{"set_$offset"}( $value );
 				}
 				break;
 		}
@@ -314,7 +316,8 @@ class WC_Product_Attribute implements ArrayAccess {
 	 *
 	 * @param string $offset Offset.
 	 */
-	public function offsetUnset( $offset ) {}
+    #[\ReturnTypeWillChange]
+	public function offsetUnset( $offset ) : void {}
 
 	/**
 	 * OffsetExists.
@@ -322,7 +325,8 @@ class WC_Product_Attribute implements ArrayAccess {
 	 * @param string $offset Offset.
 	 * @return bool
 	 */
-	public function offsetExists( $offset ) {
+    #[\ReturnTypeWillChange]
+	public function offsetExists( $offset ) : bool {
 		return in_array( $offset, array_merge( array( 'is_variation', 'is_visible', 'is_taxonomy', 'value' ), array_keys( $this->data ) ), true );
 	}
 }

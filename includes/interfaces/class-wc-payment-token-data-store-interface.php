@@ -6,10 +6,6 @@
  * @package ClassicCommerce/Interface
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * WC Payment Token Data Store Interface
  *

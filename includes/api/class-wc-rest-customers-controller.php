@@ -4,8 +4,8 @@
  *
  * Handles requests to the /customers endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Customers controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Customers_V2_Controller
  */
 class WC_REST_Customers_Controller extends WC_REST_Customers_V2_Controller {
@@ -28,38 +28,13 @@ class WC_REST_Customers_Controller extends WC_REST_Customers_V2_Controller {
 	/**
 	 * Get formatted item data.
 	 *
-	 * @since  WC-3.0.0
-	 * @param  WC_Data $object WC_Data instance.
+	 * @param WC_Data $object WC_Data instance.
+	 *
+	 * @since  3.0.0
 	 * @return array
 	 */
 	protected function get_formatted_item_data( $object ) {
-		$data        = $object->get_data();
-		$format_date = array( 'date_created', 'date_modified' );
-
-		// Format date values.
-		foreach ( $format_date as $key ) {
-			$datetime              = $data[ $key ];
-			$data[ $key ]          = wc_rest_prepare_date_response( $datetime, false );
-			$data[ $key . '_gmt' ] = wc_rest_prepare_date_response( $datetime );
-		}
-
-		return array(
-			'id'                 => $object->get_id(),
-			'date_created'       => $data['date_created'],
-			'date_created_gmt'   => $data['date_created_gmt'],
-			'date_modified'      => $data['date_modified'],
-			'date_modified_gmt'  => $data['date_modified_gmt'],
-			'email'              => $data['email'],
-			'first_name'         => $data['first_name'],
-			'last_name'          => $data['last_name'],
-			'role'               => $data['role'],
-			'username'           => $data['username'],
-			'billing'            => $data['billing'],
-			'shipping'           => $data['shipping'],
-			'is_paying_customer' => $data['is_paying_customer'],
-			'avatar_url'         => $object->get_avatar_url(),
-			'meta_data'          => $data['meta_data'],
-		);
+		return $this->get_formatted_item_data_core( $object );
 	}
 
 	/**
@@ -254,6 +229,11 @@ class WC_REST_Customers_Controller extends WC_REST_Customers_V2_Controller {
 						),
 						'country'    => array(
 							'description' => __( 'ISO code of the country.', 'classic-commerce' ),
+							'type'        => 'string',
+							'context'     => array( 'view', 'edit' ),
+						),
+						'phone'      => array(
+							'description' => __( 'Phone number.', 'classic-commerce' ),
 							'type'        => 'string',
 							'context'     => array( 'view', 'edit' ),
 						),

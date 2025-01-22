@@ -10,15 +10,18 @@
  * @version WC-3.0.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+defined( 'ABSPATH' ) || exit;
 
 if ( $cross_sells ) : ?>
 
 	<div class="cross-sells">
+    <?php
+		$heading = apply_filters( 'woocommerce_product_cross_sells_products_heading', __( 'You may be interested in&hellip;', 'classic-commerce' ) );
 
-		<h2><?php _e( 'You may be interested in&hellip;', 'classic-commerce' ) ?></h2>
+		if ( $heading ) :
+			?>
+			<h2><?php echo esc_html( $heading ); ?></h2>
+		<?php endif; ?>
 
 		<?php woocommerce_product_loop_start(); ?>
 
@@ -27,9 +30,10 @@ if ( $cross_sells ) : ?>
 				<?php
 				 	$post_object = get_post( $cross_sell->get_id() );
 
-					setup_postdata( $GLOBALS['post'] =& $post_object );
+					setup_postdata( $GLOBALS['post'] =& $post_object ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.OverrideProhibited, Squiz.PHP.DisallowMultipleAssignments.Found
 
-					wc_get_template_part( 'content', 'product' ); ?>
+					wc_get_template_part( 'content', 'product' );
+                    ?>
 
 			<?php endforeach; ?>
 
@@ -37,6 +41,7 @@ if ( $cross_sells ) : ?>
 
 	</div>
 
-<?php endif;
+    <?php
+endif;
 
 wp_reset_postdata();

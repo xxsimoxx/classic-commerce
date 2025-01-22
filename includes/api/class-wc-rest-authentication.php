@@ -2,8 +2,8 @@
 /**
  * REST API Authentication
  *
- * @package  ClassicCommerce/API
- * @since    WC-2.6.0
+ * @package  ClassicCommerce\RestApi
+ * @since    2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -39,6 +39,7 @@ class WC_REST_Authentication {
 	 */
 	public function __construct() {
 		add_filter( 'determine_current_user', array( $this, 'authenticate' ), 15 );
+		add_filter( 'rest_authentication_errors', array( $this, 'authentication_fallback' ) );
 		add_filter( 'rest_authentication_errors', array( $this, 'check_authentication_error' ), 15 );
 		add_filter( 'rest_post_dispatch', array( $this, 'send_unauthorized_headers' ), 50 );
 		add_filter( 'rest_pre_dispatch', array( $this, 'check_user_permissions' ), 10, 3 );
@@ -55,12 +56,13 @@ class WC_REST_Authentication {
 		}
 
 		$rest_prefix = trailingslashit( rest_get_url_prefix() );
+		$request_uri = esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) );
 
-		// Check if our endpoint.
-		$woocommerce = ( false !== strpos( $_SERVER['REQUEST_URI'], $rest_prefix . 'wc/' ) ); // @codingStandardsIgnoreLine
+		// Check if the request is to the WC API endpoints.
+		$woocommerce = ( false !== strpos( $request_uri, $rest_prefix . 'wc/' ) );
 
 		// Allow third party plugins use our authentication methods.
-		$third_party = ( false !== strpos( $_SERVER['REQUEST_URI'], $rest_prefix . 'wc-' ) ); // @codingStandardsIgnoreLine
+		$third_party = ( false !== strpos( $request_uri, $rest_prefix . 'wc-' ) );
 
 		return apply_filters( 'woocommerce_rest_is_request_to_rest_api', $woocommerce || $third_party );
 	}
@@ -86,6 +88,33 @@ class WC_REST_Authentication {
 		}
 
 		return $this->perform_oauth_authentication();
+	}
+
+	/**
+	 * Authenticate the user if authentication wasn't performed during the
+	 * determine_current_user action.
+	 *
+	 * Necessary in cases where wp_get_current_user() is called before WooCommerce is loaded.
+	 *
+	 * @see https://github.com/woocommerce/woocommerce/issues/26847
+	 *
+	 * @param WP_Error|null|bool $error Error data.
+	 * @return WP_Error|null|bool
+	 */
+	public function authentication_fallback( $error ) {
+		if ( ! empty( $error ) ) {
+			// Another plugin has already declared a failure.
+			return $error;
+		}
+		if ( empty( $this->error ) && empty( $this->auth_method ) && empty( $this->user ) && 0 === get_current_user_id() ) {
+			// Authentication hasn't occurred during `determine_current_user`, so check auth.
+			$user_id = $this->authenticate( false );
+			if ( $user_id ) {
+				wp_set_current_user( $user_id );
+				return true;
+			}
+		}
+		return $error;
 	}
 
 	/**
@@ -175,7 +204,7 @@ class WC_REST_Authentication {
 	/**
 	 * Parse the Authorization header into parameters.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 *
 	 * @param string $header Authorization header value (not including "Authorization: " prefix).
 	 *
@@ -208,7 +237,7 @@ class WC_REST_Authentication {
 	 * generate `PHP_AUTH_USER`/`PHP_AUTH_PASS` but not passed on. We use
 	 * `getallheaders` here to try and grab it out instead.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 *
 	 * @return string Authorization header if set.
 	 */
@@ -233,7 +262,7 @@ class WC_REST_Authentication {
 	/**
 	 * Get oAuth parameters from $_GET, $_POST or request header.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 *
 	 * @return array|WP_Error
 	 */
@@ -558,6 +587,19 @@ class WC_REST_Authentication {
 	private function update_last_access() {
 		global $wpdb;
 
+        /**
+		 * This filter enables the exclusion of the most recent access time from being logged for REST API calls.
+		 *
+		 * @param bool $result  Default value.
+		 * @param int  $key_id  Key ID associated with REST API request.
+		 * @param int  $user_id User ID associated with REST API request.
+		 *
+		 * @since 7.7.0
+		 */
+		if ( apply_filters( 'woocommerce_disable_rest_api_access_log', false, $this->user->key_id, $this->user->user_id ) ) {
+			return;
+		}
+
 		$wpdb->update(
 			$wpdb->prefix . 'woocommerce_api_keys',
 			array( 'last_access' => current_time( 'mysql' ) ),
@@ -577,7 +619,7 @@ class WC_REST_Authentication {
 	 */
 	public function send_unauthorized_headers( $response ) {
 		if ( is_wp_error( $this->get_error() ) && 'basic_auth' === $this->auth_method ) {
-			$auth_message = __( 'Classic Commerce API. Use a consumer key in the username field and a consumer secret in the password field.', 'classic-commerce' );
+			$auth_message = __( 'WooCommerce API. Use a consumer key in the username field and a consumer secret in the password field.', 'classic-commerce' );
 			$response->header( 'WWW-Authenticate', 'Basic realm="' . $auth_message . '"', true );
 		}
 

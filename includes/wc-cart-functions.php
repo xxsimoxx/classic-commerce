@@ -107,7 +107,7 @@ function wc_add_to_cart_message( $products, $show_qty = false, $return = false )
 
 	foreach ( $products as $product_id => $qty ) {
 		/* translators: %s: product name */
-		$titles[] = ( $qty > 1 ? absint( $qty ) . ' &times; ' : '' ) . apply_filters( 'woocommerce_add_to_cart_item_name_in_quotes', sprintf( _x( '&ldquo;%s&rdquo;', 'Item name in quotes', 'classic-commerce' ), strip_tags( get_the_title( $product_id ) ) ), $product_id );
+		$titles[] = apply_filters( 'woocommerce_add_to_cart_qty_html', ( $qty > 1 ? absint( $qty ) . ' &times; ' : '' ), $product_id ) . apply_filters( 'woocommerce_add_to_cart_item_name_in_quotes', sprintf( _x( '&ldquo;%s&rdquo;', 'Item name in quotes', 'classic-commerce' ), strip_tags( get_the_title( $product_id ) ) ), $product_id );
 		$count   += $qty;
 	}
 
@@ -118,9 +118,9 @@ function wc_add_to_cart_message( $products, $show_qty = false, $return = false )
 	// Output success messages.
 	if ( 'yes' === get_option( 'woocommerce_cart_redirect_after_add' ) ) {
 		$return_to = apply_filters( 'woocommerce_continue_shopping_redirect', wc_get_raw_referer() ? wp_validate_redirect( wc_get_raw_referer(), false ) : wc_get_page_permalink( 'shop' ) );
-		$message   = sprintf( '<a href="%s" tabindex="1" class="button wc-forward">%s</a> %s', esc_url( $return_to ), esc_html__( 'Continue shopping', 'classic-commerce' ), esc_html( $added_text ) );
+		$message   = sprintf( '%s <a href="%s" class="button wc-forward">%s</a>', esc_html( $added_text ), esc_url( $return_to ), esc_html__( 'Continue shopping', 'classic-commerce' ) );
 	} else {
-		$message = sprintf( '<a href="%s" tabindex="1" class="button wc-forward">%s</a> %s', esc_url( wc_get_page_permalink( 'cart' ) ), esc_html__( 'View cart', 'classic-commerce' ), esc_html( $added_text ) );
+		$message = sprintf( '%s <a href="%s" class="button wc-forward">%s</a>', esc_html( $added_text ), esc_url( wc_get_cart_url() ), esc_html__( 'View cart', 'classic-commerce' ) );
 	}
 
 	if ( has_filter( 'wc_add_to_cart_message' ) ) {
@@ -133,7 +133,7 @@ function wc_add_to_cart_message( $products, $show_qty = false, $return = false )
 	if ( $return ) {
 		return $message;
 	} else {
-		wc_add_notice( $message );
+		wc_add_notice( $message, apply_filters( 'woocommerce_add_to_cart_notice_type', 'success' ) );
 	}
 }
 
@@ -165,6 +165,10 @@ function wc_format_list_of_items( $items ) {
 function wc_clear_cart_after_payment() {
 	global $wp;
 
+    $should_clear_cart_after_payment = false;
+    $after_payment                   = false;
+
+	// If the order has been received, clear the cart.
 	if ( ! empty( $wp->query_vars['order-received'] ) ) {
 
 		$order_id  = absint( $wp->query_vars['order-received'] );
@@ -173,24 +177,42 @@ function wc_clear_cart_after_payment() {
 		if ( $order_id > 0 ) {
 			$order = wc_get_order( $order_id );
 
-			if ( $order && $order->get_order_key() === $order_key ) {
-				WC()->cart->empty_cart();
+			if ( $order instanceof WC_Order && hash_equals( $order->get_order_key(), $order_key ) ) {
+				$should_clear_cart_after_payment = true;
+                $after_payment                   = true;
 			}
 		}
 	}
 
-	if ( WC()->session->order_awaiting_payment > 0 ) {
+    // If the order is awaiting payment, and we haven't already decided to clear the cart, check the order status.
+	if ( is_object( WC()->session ) && WC()->session->order_awaiting_payment > 0 && ! $should_clear_cart_after_payment ) {
 		$order = wc_get_order( WC()->session->order_awaiting_payment );
 
-		if ( $order && $order->get_id() > 0 ) {
-			// If the order has not failed, or is not pending, the order must have gone through.
-			if ( ! $order->has_status( array( 'failed', 'pending', 'cancelled' ) ) ) {
-				WC()->cart->empty_cart();
-			}
+		if ( $order instanceof WC_Order && $order->get_id() > 0 ) {
+			// If the order status is neither pending, failed, nor cancelled, the order must have gone through.
+			$should_clear_cart_after_payment = ! $order->has_status( array( 'failed', 'pending', 'cancelled' ) );
+			$after_payment                   = true;
 		}
 	}
+
+    // If it doesn't look like a payment happened, bail early.
+	if ( ! $after_payment ) {
+		return;
+	}
+
+	/**
+	 * Determine whether the cart should be cleared after payment.
+	 *
+	 * @since 9.3.0
+	 * @param bool $should_clear_cart_after_payment Whether the cart should be cleared after payment.
+	 */
+	$should_clear_cart_after_payment = apply_filters( 'woocommerce_should_clear_cart_after_payment', $should_clear_cart_after_payment );
+
+	if ( $should_clear_cart_after_payment ) {
+		WC()->cart->empty_cart();
+	}
 }
-add_action( 'get_header', 'wc_clear_cart_after_payment' );
+add_action( 'template_redirect', 'wc_clear_cart_after_payment', 20 );
 
 /**
  * Get the subtotal.
@@ -218,11 +240,12 @@ function wc_cart_totals_shipping_html() {
 		}
 
 		wc_get_template(
-			'cart/cart-shipping.php', array(
+			'cart/cart-shipping.php',
+            array(
 				'package'                  => $package,
 				'available_methods'        => $package['rates'],
 				'show_package_details'     => count( $packages ) > 1,
-				'show_shipping_calculator' => is_cart() && $first,
+				'show_shipping_calculator' => is_cart() && apply_filters( 'woocommerce_shipping_show_shipping_calculator', $first, $i, $package ),
 				'package_details'          => implode( ', ', $product_names ),
 				/* translators: %d: shipping package number */
 				'package_name'             => apply_filters( 'woocommerce_shipping_package_name', ( ( $i + 1 ) > 1 ) ? sprintf( _x( 'Shipping %d', 'shipping packages', 'classic-commerce' ), ( $i + 1 ) ) : _x( 'Shipping', 'shipping packages', 'classic-commerce' ), $i, $package ),
@@ -277,8 +300,6 @@ function wc_cart_totals_coupon_html( $coupon ) {
 		$coupon = new WC_Coupon( $coupon );
 	}
 
-	$discount_amount_html = '';
-
 	$amount               = WC()->cart->get_coupon_discount_amount( $coupon->get_code(), WC()->cart->display_cart_ex_tax );
 	$discount_amount_html = '-' . wc_price( $amount );
 
@@ -313,10 +334,16 @@ function wc_cart_totals_order_total_html() {
 
 		if ( ! empty( $tax_string_array ) ) {
 			$taxable_address = WC()->customer->get_taxable_address();
-			/* translators: %s: country name */
-			$estimated_text = WC()->customer->is_customer_outside_base() && ! WC()->customer->has_calculated_shipping() ? sprintf( ' ' . __( 'estimated for %s', 'classic-commerce' ), WC()->countries->estimated_for_prefix( $taxable_address[0] ) . WC()->countries->countries[ $taxable_address[0] ] ) : '';
-			/* translators: %s: tax information */
-			$value .= '<small class="includes_tax">' . sprintf( __( '(includes %s)', 'classic-commerce' ), implode( ', ', $tax_string_array ) . $estimated_text ) . '</small>';
+			if ( WC()->customer->is_customer_outside_base() && ! WC()->customer->has_calculated_shipping() ) {
+				$country = WC()->countries->estimated_for_prefix( $taxable_address[0] ) . WC()->countries->countries[ $taxable_address[0] ];
+				/* translators: 1: tax amount 2: country name */
+				$tax_text = wp_kses_post( sprintf( __( '(includes %1$s estimated for %2$s)', 'classic-commerce' ), implode( ', ', $tax_string_array ), $country ) );
+			} else {
+				/* translators: %s: tax amount */
+				$tax_text = wp_kses_post( sprintf( __( '(includes %s)', 'classic-commerce' ), implode( ', ', $tax_string_array ) ) );
+			}
+
+			$value .= '<small class="includes_tax">' . $tax_text . '</small>'; 
 		}
 	}
 
@@ -341,9 +368,11 @@ function wc_cart_totals_fee_html( $fee ) {
  * @return string
  */
 function wc_cart_totals_shipping_method_label( $method ) {
-	$label = $method->get_label();
+	$label     = $method->get_label();
+	$has_cost  = 0 < $method->cost;
+	$hide_cost = ! $has_cost && in_array( $method->get_method_id(), array( 'free_shipping', 'local_pickup' ), true );
 
-	if ( $method->cost >= 0 && $method->get_method_id() !== 'free_shipping' ) {
+	if ( $has_cost && ! $hide_cost ) {
 		if ( WC()->cart->display_prices_including_tax() ) {
 			$label .= ': ' . wc_price( $method->cost + $method->get_shipping_tax() );
 			if ( $method->get_shipping_tax() > 0 && ! wc_prices_include_tax() ) {
@@ -379,11 +408,19 @@ function wc_cart_round_discount( $value, $precision ) {
  */
 function wc_get_chosen_shipping_method_ids() {
 	$method_ids     = array();
-	$chosen_methods = WC()->session->get( 'chosen_shipping_methods', array() );
+    $chosen_methods = array();
+
+	if ( is_callable( array( WC()->session, 'get' ) ) ) {
+		$chosen_methods = WC()->session->get( 'chosen_shipping_methods', array() );
+	}
 	foreach ( $chosen_methods as $chosen_method ) {
+        if ( ! is_string( $chosen_method ) ) {
+			continue;
+		}
 		$chosen_method = explode( ':', $chosen_method );
 		$method_ids[]  = current( $chosen_method );
 	}
+    
 	return $method_ids;
 }
 
@@ -393,7 +430,7 @@ function wc_get_chosen_shipping_method_ids() {
  * @since  WC-3.2.0
  * @param  int   $key Key of package.
  * @param  array $package Package data array.
- * @return string|bool
+ * @return string|bool Either the chosen method ID or false if nothing is chosen yet.
  */
 function wc_get_chosen_shipping_method_for_package( $key, $package ) {
 	$chosen_methods = WC()->session->get( 'chosen_shipping_methods' );
@@ -447,7 +484,7 @@ function wc_get_default_shipping_method_for_package( $key, $package, $chosen_met
 			break;
 		}
 	}
-	return apply_filters( 'woocommerce_shipping_chosen_method', $default, $package['rates'], $chosen_method );
+	return (string) apply_filters( 'woocommerce_shipping_chosen_method', $default, $package['rates'], $chosen_method );
 }
 
 /**

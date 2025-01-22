@@ -16,11 +16,26 @@ defined( 'ABSPATH' ) || exit;
  * Order item class.
  */
 class WC_Order_Item extends WC_Data implements ArrayAccess {
+	/**
+	 * Legacy cart item values.
+	 *
+	 * @deprecated 4.4.0 For legacy actions.
+	 * @var array
+	 */
+	public $legacy_values;
+
+	/**
+	 * Legacy cart item keys.
+	 *
+	 * @deprecated 4.4.0 For legacy actions.
+	 * @var string
+	 */
+	public $legacy_cart_item_key;
 
 	/**
 	 * Order Data array. This is the core order data exposed in APIs since 3.0.0.
 	 *
-	 * @since WC-3.0.0
+	 * @since 3.0.0
 	 * @var array
 	 */
 	protected $data = array(
@@ -38,7 +53,7 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 
 	/**
 	 * Meta type. This should match up with
-	 * the types available at https://codex.wordpress.org/Function_Reference/add_metadata.
+	 * the types available at https://developer.wordpress.org/reference/functions/add_metadata/.
 	 * WP defines 'post', 'user', 'comment', and 'term'.
 	 *
 	 * @var string
@@ -51,6 +66,14 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	 * @var string
 	 */
 	protected $object_type = 'order_item';
+
+	/**
+	 * Legacy package key.
+	 *
+	 * @deprecated 4.4.0 For legacy actions.
+	 * @var string
+	 */
+	public $legacy_package_key;
 
 	/**
 	 * Constructor.
@@ -81,11 +104,11 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	 * array_replace_recursive does not work well for order items because it merges taxes instead
 	 * of replacing them.
 	 *
-	 * @since WC-3.2.0
+	 * @since 3.2.0
 	 */
 	public function apply_changes() {
 		if ( function_exists( 'array_replace' ) ) {
-			$this->data = array_replace( $this->data, $this->changes ); // phpcs:ignore PHPCompatibility.PHP.NewFunctions.array_replaceFound
+			$this->data = array_replace( $this->data, $this->changes ); // phpcs:ignore PHPCompatibility.FunctionUse.NewFunctions.array_replaceFound
 		} else { // PHP 5.2 compatibility.
 			foreach ( $this->changes as $key => $change ) {
 				$this->data[ $key ] = $change;
@@ -208,7 +231,7 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	/**
 	 * Calculate item taxes.
 	 *
-	 * @since  WC-3.2.0
+	 * @since  3.2.0
 	 * @param  array $calculate_tax_for Location data to get taxes for. Required.
 	 * @return bool  True if taxes were calculated.
 	 */
@@ -246,6 +269,17 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	| Meta Data Handling
 	|--------------------------------------------------------------------------
 	*/
+
+	/**
+	 * Wrapper for get_formatted_meta_data that includes all metadata by default. See https://github.com/woocommerce/woocommerce/pull/30948
+	 *
+	 * @param string $hideprefix  Meta data prefix, (default: _).
+	 * @param bool   $include_all Include all meta data, this stop skip items with values already in the product name.
+	 * @return array
+	 */
+	public function get_all_formatted_meta_data( $hideprefix = '_', $include_all = true ) {
+		return $this->get_formatted_meta_data( $hideprefix, $include_all );
+	}
 
 	/**
 	 * Expands things like term slugs before return.
@@ -310,6 +344,7 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	 * @param string $offset Offset.
 	 * @param mixed  $value  Value.
 	 */
+	#[\ReturnTypeWillChange]
 	public function offsetSet( $offset, $value ) {
 		if ( 'item_meta_array' === $offset ) {
 			foreach ( $value as $meta_id => $meta ) {
@@ -334,6 +369,7 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	 *
 	 * @param string $offset Offset.
 	 */
+	#[\ReturnTypeWillChange]
 	public function offsetUnset( $offset ) {
 		$this->maybe_read_meta_data();
 
@@ -359,6 +395,7 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	 * @param string $offset Offset.
 	 * @return bool
 	 */
+	#[\ReturnTypeWillChange]
 	public function offsetExists( $offset ) {
 		$this->maybe_read_meta_data();
 		if ( 'item_meta_array' === $offset || 'item_meta' === $offset || array_key_exists( $offset, $this->data ) ) {
@@ -373,6 +410,7 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	 * @param string $offset Offset.
 	 * @return mixed
 	 */
+	#[\ReturnTypeWillChange]
 	public function offsetGet( $offset ) {
 		$this->maybe_read_meta_data();
 

@@ -4,8 +4,8 @@
  *
  * Returns an array of continents.
  *
- * @package ClassicCommerce/i18n
- * @version WC-2.5.0
+ * @package WooCommerce\i18n
+ * @version 2.5.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -154,7 +154,6 @@ return array(
 			'BG',
 			'BY',
 			'CH',
-			'CY',
 			'CZ',
 			'DE',
 			'DK',

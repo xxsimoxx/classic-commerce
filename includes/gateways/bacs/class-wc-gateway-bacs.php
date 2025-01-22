@@ -28,6 +28,20 @@ class WC_Gateway_BACS extends WC_Payment_Gateway {
 	 */
 	public $locale;
 
+    /**
+	 * Gateway instructions that will be added to the thank you page and emails.
+	 *
+	 * @var string
+	 */
+	public $instructions;
+
+	/**
+	 * Account details.
+	 *
+	 * @var array
+	 */
+	public $account_details;
+
 	/**
 	 * Constructor for the gateway.
 	 */
@@ -129,7 +143,12 @@ class WC_Gateway_BACS extends WC_Payment_Gateway {
 
 		?>
 		<tr valign="top">
-			<th scope="row" class="titledesc"><?php esc_html_e( 'Account details:', 'classic-commerce' ); ?></th>
+			<th scope="row" class="titledesc">
+				<label>
+					<?php esc_html_e( 'Account details:', 'classic-commerce' ); ?>
+					<?php echo wp_kses_post( wc_help_tip( __( 'These account details will be displayed within the order thank you page and confirmation email.', 'classic-commerce' ) ) ); ?>
+				</label>
+			</th>
 			<td class="forminp" id="bacs_accounts">
 				<div class="wc_input_table_wrapper">
 					<table class="widefat wc_input_table sortable" cellspacing="0">
@@ -258,8 +277,14 @@ class WC_Gateway_BACS extends WC_Payment_Gateway {
 	 * @param bool     $plain_text Email format: plain text or HTML.
 	 */
 	public function email_instructions( $order, $sent_to_admin, $plain_text = false ) {
-
-		if ( ! $sent_to_admin && 'bacs' === $order->get_payment_method() && $order->has_status( 'on-hold' ) ) {
+        /**
+		 * Filter the email instructions order status.
+		 *
+		 * @since 7.4
+		 * @param string $terms The order status.
+		 * @param object $order The order object.
+		 */
+		if ( ! $sent_to_admin && 'bacs' === $order->get_payment_method() && $order->has_status( apply_filters( 'woocommerce_bacs_email_instructions_order_status', 'on-hold', $order ) ) ) {
 			if ( $this->instructions ) {
 				echo wp_kses_post( wpautop( wptexturize( $this->instructions ) ) . PHP_EOL );
 			}
@@ -289,7 +314,7 @@ class WC_Gateway_BACS extends WC_Payment_Gateway {
 		// Get sortcode label in the $locale array and use appropriate one.
 		$sortcode = isset( $locale[ $country ]['sortcode']['label'] ) ? $locale[ $country ]['sortcode']['label'] : __( 'Sort code', 'classic-commerce' );
 
-		$bacs_accounts = apply_filters( 'woocommerce_bacs_accounts', $this->account_details );
+		$bacs_accounts = apply_filters( 'woocommerce_bacs_accounts', $this->account_details, $order_id );
 
 		if ( ! empty( $bacs_accounts ) ) {
 			$account_html = '';

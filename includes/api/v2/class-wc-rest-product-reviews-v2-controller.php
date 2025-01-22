@@ -4,8 +4,8 @@
  *
  * Handles requests to /products/<product_id>/reviews.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Product Reviews Controller Class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Product_Reviews_V1_Controller
  */
 class WC_REST_Product_Reviews_V2_Controller extends WC_REST_Product_Reviews_V1_Controller {
@@ -64,8 +64,8 @@ class WC_REST_Product_Reviews_V2_Controller extends WC_REST_Product_Reviews_V1_C
 	 * @return WP_Error|boolean
 	 */
 	public function batch_items_permissions_check( $request ) {
-		if ( ! wc_rest_check_post_permissions( 'product', 'batch' ) ) {
-			return new WP_Error( 'woocommerce_rest_cannot_edit', __( 'Sorry, you are not allowed to batch manipulate this resource.', 'classic-commerce' ), array( 'status' => rest_authorization_required_code() ) );
+		if ( ! wc_rest_check_product_reviews_permissions( 'batch' ) ) {
+			return new WP_Error( 'woocommerce_rest_cannot_batch', __( 'Sorry, you are not allowed to batch manipulate this resource.', 'classic-commerce' ), array( 'status' => rest_authorization_required_code() ) );
 		}
 		return true;
 	}
@@ -112,7 +112,7 @@ class WC_REST_Product_Reviews_V2_Controller extends WC_REST_Product_Reviews_V1_C
 	/**
 	 * Bulk create, update and delete items.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param WP_REST_Request $request Full details about the request.
 	 * @return array Of WP_Error or WP_REST_Response.
 	 */

@@ -9,18 +9,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$force_update_url = wp_nonce_url(
-	add_query_arg( 'force_update_woocommerce', 'true', admin_url( 'admin.php?page=wc-settings' ) ),
-	'wc_force_db_update',
-	'wc_force_db_update_nonce'
-);
-
+$cron_disabled       = defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON;
 ?>
 <div id="message" class="updated woocommerce-message wc-connect">
 	<p>
-		<strong><?php esc_html_e( 'Classic Commerce data update', 'classic-commerce' ); ?></strong> &#8211; <?php esc_html_e( 'Your database is being updated in the background.', 'classic-commerce' ); ?>
-		<a href="<?php echo esc_url( $force_update_url ); ?>">
-			<?php esc_html_e( 'Taking a while? Click here to run it now.', 'classic-commerce' ); ?>
-		</a>
+		<strong><?php esc_html_e( 'Classic Commerce database update', 'classic-commerce' ); ?></strong><br>
+		<?php esc_html_e( 'Classic Commerce is updating the database in the background. The database update process may take a little while, so please be patient.', 'classic-commerce' ); ?>
+		<?php
+		if ( $cron_disabled ) {
+			echo '<br>' . esc_html__( 'Note: WP CRON has been disabled on your install which may prevent this update from completing.', 'classic-commerce' );
+		}
+		?>
 	</p>
 </div>

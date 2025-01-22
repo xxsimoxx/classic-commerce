@@ -4,8 +4,8 @@
  *
  * Handles requests to the /shipping/zones/<id>/methods endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-3.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   3.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Shipping Zone Methods class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Shipping_Zones_Controller_Base
  */
 class WC_REST_Shipping_Zone_Methods_V2_Controller extends WC_REST_Shipping_Zones_Controller_Base {
@@ -231,13 +231,16 @@ class WC_REST_Shipping_Zone_Methods_V2_Controller extends WC_REST_Shipping_Zones
 		}
 
 		/**
-		 * Fires after a product review is deleted via the REST API.
+		 * Fires after a shipping zone is deleted via the REST API.
 		 *
-		 * @param object           $method
-		 * @param WP_REST_Response $response        The response data.
-		 * @param WP_REST_Request  $request         The request sent to the API.
+		 * @since 9.1.0
+		 *
+		 * @param WC_Shipping_Method $method   The shipping zone method being deleted.
+		 * @param WC_Shipping_Zone   $zone     The shipping zone the method belonged to.
+		 * @param WP_REST_Response   $response The response data.
+		 * @param WP_REST_Request    $request  The request sent to the API.
 		 */
-		do_action( 'rest_delete_product_review', $method, $response, $request );
+		do_action( 'woocommerce_rest_delete_shipping_zone_method', $method, $zone, $response, $request );
 
 		return $response;
 	}

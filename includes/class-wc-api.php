@@ -1,48 +1,82 @@
 <?php
 /**
- * Classic Commerce API
+ * Classic Commerce API class loader.
  *
- * Handles WC-API endpoint requests.
+ * This handles APIs in Classic Commerce. These include:.
+ * - wc-api endpoint - Commonly used by Payment gateways for callbacks.
+ * - Legacy REST API - Deprecated in 2.6.0. @see class-wc-legacy-api.php
+ * - WP REST API - The main REST API in Classic Commerce which is built on top of the WP REST API.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.0.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * API class.
+ * WC_API class.
  */
 class WC_API extends WC_Legacy_API {
 
-	/**
+    public $controller;
+
+    /**
 	 * Setup class.
 	 *
-	 * @since WC-2.0
+	 * @since 2.0
 	 */
 	public function __construct() {
-		parent::__construct();
 
-		// Add query vars.
-		add_filter( 'query_vars', array( $this, 'add_query_vars' ), 0 );
-
-		// Register API endpoints.
-		add_action( 'init', array( $this, 'add_endpoint' ), 0 );
-
-		// Handle wc-api endpoint requests.
-		add_action( 'parse_request', array( $this, 'handle_api_requests' ), 0 );
-
-		// Ensure payment gateways are initialized in time for API requests.
-		add_action( 'woocommerce_api_request', array( 'WC_Payment_Gateways', 'instance' ), 0 );
-
-		// WP REST API.
+        $this->wc_api_init();
 		$this->rest_api_init();
+    }
+
+    /**
+	 * Init the WC API by adding endpoints for those requests.
+     */
+	private function wc_api_init() {
+		add_filter( 'query_vars', array( $this, 'add_query_vars' ), 0 );
+		add_action( 'init', array( $this, 'add_endpoint' ), 0 );
+		add_action( 'parse_request', array( $this, 'handle_api_requests' ), 0 );
+    }
+
+    /**
+	 * Init WP REST API by hooking into `rest_api_init`.
+     */
+	private function rest_api_init() {
+		// Authentication needs to run early to handle basic auth.
+		include_once dirname( __FILE__ ) . '/api/class-wc-rest-authentication.php';
+
+        add_action( 'rest_api_init', array( $this, 'rest_api_includes' ), 5 );
+		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ), 10 );
+	}
+
+    /**
+	 * Get data from a WooCommerce API endpoint.
+	 *
+	 * @since 3.7.0
+	 * @param string $endpoint Endpoint.
+	 * @param array  $params Params to passwith request.
+	 * @return array|\WP_Error
+	 */
+	public function get_endpoint_data( $endpoint, $params = array() ) {
+		if ( ! $this->rest_api_init() ) {
+			return new WP_Error( 'rest_api_unavailable', __( 'The Rest API is unavailable.', 'classic-commerce' ) );
+		}
+		$request = new \WP_REST_Request( 'GET', $endpoint );
+		if ( $params ) {
+			$request->set_query_params( $params );
+		}
+		$response = rest_do_request( $request );
+		$server   = rest_get_server();
+		$json     = wp_json_encode( $server->response_to_data( $response, false ) );
+		return json_decode( $json, true );
 	}
 
 	/**
 	 * Add new query vars.
 	 *
-	 * @since WC-2.0
+	 * @since 2.0
 	 * @param array $vars Query vars.
 	 * @return string[]
 	 */
@@ -55,7 +89,7 @@ class WC_API extends WC_Legacy_API {
 	/**
 	 * WC API for payment gateway IPNs, etc.
 	 *
-	 * @since WC-2.0
+	 * @since 2.0
 	 */
 	public static function add_endpoint() {
 		parent::add_endpoint();
@@ -65,8 +99,8 @@ class WC_API extends WC_Legacy_API {
 	/**
 	 * API request - Trigger any API requests.
 	 *
-	 * @since   WC-2.0
-	 * @version WC-2.4
+	 * @since   2.0
+	 * @version 2.4
 	 */
 	public function handle_api_requests() {
 		global $wp;
@@ -87,6 +121,9 @@ class WC_API extends WC_Legacy_API {
 			// Clean the API request.
 			$api_request = strtolower( wc_clean( $wp->query_vars['wc-api'] ) );
 
+			// Make sure gateways are available for request.
+			WC()->payment_gateways();
+
 			// Trigger generic action before request hook.
 			do_action( 'woocommerce_api_request', $api_request );
 
@@ -102,34 +139,14 @@ class WC_API extends WC_Legacy_API {
 		}
 	}
 
-	/**
-	 * Init WP REST API.
-	 *
-	 * @since WC-2.6.0
-	 */
-	private function rest_api_init() {
-		// REST API was included starting WordPress 4.4.
-		if ( ! class_exists( 'WP_REST_Server' ) ) {
-			return;
-		}
-
-		$this->rest_api_includes();
-
-		// Init REST API routes.
-		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ), 10 );
-	}
-
-	/**
+    /**
 	 * Include REST API classes.
 	 *
-	 * @since WC-2.6.0
+	 * @since 2.6.0
 	 */
-	private function rest_api_includes() {
+	public function rest_api_includes() {
 		// Exception handler.
 		include_once dirname( __FILE__ ) . '/api/class-wc-rest-exception.php';
-
-		// Authentication.
-		include_once dirname( __FILE__ ) . '/api/class-wc-rest-authentication.php';
 
 		// Abstract controllers.
 		include_once dirname( __FILE__ ) . '/abstracts/abstract-wc-rest-controller.php';
@@ -140,31 +157,31 @@ class WC_API extends WC_Legacy_API {
 		include_once dirname( __FILE__ ) . '/abstracts/abstract-wc-settings-api.php';
 
 		// REST API v1 controllers.
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-coupons-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-customer-downloads-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-customers-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-orders-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-order-notes-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-order-refunds-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-attribute-terms-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-attributes-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-categories-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-reviews-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-shipping-classes-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-tags-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-products-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-report-sales-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-report-top-sellers-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-reports-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-tax-classes-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-taxes-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-webhook-deliveries-controller.php';
-		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-webhooks-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-coupons-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-customer-downloads-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-customers-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-orders-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-order-notes-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-order-refunds-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-attribute-terms-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-attributes-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-categories-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-reviews-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-shipping-classes-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-product-tags-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-products-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-report-sales-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-report-top-sellers-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-reports-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-tax-classes-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-taxes-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-webhook-deliveries-v1-controller.php';
+		include_once dirname( __FILE__ ) . '/api/v1/class-wc-rest-webhooks-v1-controller.php';
 
 		// Legacy v2 code.
-		include_once dirname( __FILE__ ) . '/api/legacy/class-wc-rest-legacy-coupons-controller.php';
-		include_once dirname( __FILE__ ) . '/api/legacy/class-wc-rest-legacy-orders-controller.php';
-		include_once dirname( __FILE__ ) . '/api/legacy/class-wc-rest-legacy-products-controller.php';
+		include_once dirname( __FILE__ ) . '/legacy/api/class-wc-rest-legacy-coupons-controller.php';
+		include_once dirname( __FILE__ ) . '/legacy/api/class-wc-rest-legacy-orders-controller.php';
+		include_once dirname( __FILE__ ) . '/legacy/api/class-wc-rest-legacy-products-controller.php';
 
 		// REST API v2 controllers.
 		include_once dirname( __FILE__ ) . '/api/v2/class-wc-rest-coupons-v2-controller.php';
@@ -244,7 +261,7 @@ class WC_API extends WC_Legacy_API {
 	/**
 	 * Register REST API routes.
 	 *
-	 * @since WC-2.6.0
+	 * @since 2.6.0
 	 */
 	public function register_rest_routes() {
 		// Register settings to the REST API.
@@ -349,15 +366,15 @@ class WC_API extends WC_Legacy_API {
 		);
 
 		foreach ( $controllers as $controller ) {
-			$this->$controller = new $controller();
-			$this->$controller->register_routes();
+			$controller = new $controller();
+			$controller->register_routes();
 		}
 	}
 
 	/**
 	 * Register WC settings from WP-API to the REST API.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 */
 	public function register_wp_admin_settings() {
 		$pages = WC_Admin_Settings::get_settings_pages();
@@ -370,5 +387,4 @@ class WC_API extends WC_Legacy_API {
 			new WC_Register_WP_Admin_Settings( $email, 'email' );
 		}
 	}
-
 }

@@ -4,19 +4,22 @@
  *
  * Handles requests to the /orders endpoint.
  *
- * @package  ClassicCommerce/API
- * @since    WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since    2.6.0
  */
+
+use ClassicCommerce\Utilities\ArrayUtil;
+use ClassicCommerce\Utilities\StringUtil;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * REST API Orders controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_CRUD_Controller
  */
-class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
+class WC_REST_Orders_V2_Controller extends WC_REST_CRUD_Controller {
 
 	/**
 	 * Endpoint namespace.
@@ -58,7 +61,9 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 	 */
 	public function register_routes() {
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base, array(
+			$this->namespace,
+			'/' . $this->rest_base,
+			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
 					'callback'            => array( $this, 'get_items' ),
@@ -76,7 +81,9 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 		);
 
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base . '/(?P<id>[\d]+)', array(
+			$this->namespace,
+			'/' . $this->rest_base . '/(?P<id>[\d]+)',
+			array(
 				'args'   => array(
 					'id' => array(
 						'description' => __( 'Unique identifier for the resource.', 'classic-commerce' ),
@@ -114,7 +121,9 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 		);
 
 		register_rest_route(
-			$this->namespace, '/' . $this->rest_base . '/batch', array(
+			$this->namespace,
+			'/' . $this->rest_base . '/batch',
+			array(
 				array(
 					'methods'             => WP_REST_Server::EDITABLE,
 					'callback'            => array( $this, 'batch_items' ),
@@ -129,7 +138,7 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 	/**
 	 * Get object. Return false if object is not of required type.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  int $id Object ID.
 	 * @return WC_Data|bool
 	 */
@@ -160,10 +169,27 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 			}
 		}
 
-		// Add SKU and PRICE to products.
+		// Add SKU, PRICE, and IMAGE to products.
 		if ( is_callable( array( $item, 'get_product' ) ) ) {
 			$data['sku']   = $item->get_product() ? $item->get_product()->get_sku() : null;
 			$data['price'] = $item->get_quantity() ? $item->get_total() / $item->get_quantity() : 0;
+
+			$image_id      = $item->get_product() ? $item->get_product()->get_image_id() : 0;
+			$data['image'] = array(
+				'id'  => $image_id,
+				'src' => $image_id ? wp_get_attachment_image_url( $image_id, 'full' ) : '',
+			);
+		}
+
+		// Add parent_name if the product is a variation.
+		if ( is_callable( array( $item, 'get_product' ) ) ) {
+			$product = $item->get_product();
+
+			if ( is_callable( array( $product, 'get_parent_data' ) ) ) {
+				$data['parent_name'] = $product->get_title();
+			} else {
+				$data['parent_name'] = null;
+			}
 		}
 
 		// Format taxes.
@@ -191,21 +217,159 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 		unset( $data['order_id'] );
 		unset( $data['type'] );
 
+		// Expand meta_data to include user-friendly values.
+		$formatted_meta_data = $item->get_all_formatted_meta_data( null );
+
+		// Filter out product variations.
+		if ( isset( $product ) && 'true' === $this->request['order_item_display_meta'] ) {
+			$order_item_name   = $data['name'];
+			$data['meta_data'] = array_filter(
+				$data['meta_data'],
+				function ( $meta ) use ( $product, $order_item_name ) {
+					$display_value = wp_kses_post( rawurldecode( (string) $meta->value ) );
+
+					// Skip items with values already in the product details area of the product name.
+					if ( $product && $product->is_type( 'variation' ) && wc_is_attribute_in_product_name( $display_value, $order_item_name ) ) {
+						return false;
+					}
+
+					return true;
+				}
+			);
+		}
+
+		// Add additional applied coupon information.
+		if ( $item instanceof WC_Order_Item_Coupon ) {
+			$temp_coupon = new WC_Coupon();
+			$coupon_info = $item->get_meta( 'coupon_info', true );
+			if ( $coupon_info ) {
+				$temp_coupon->set_short_info( $coupon_info );
+			} else {
+				$coupon_meta = $item->get_meta( 'coupon_data', true );
+				if ( $coupon_meta ) {
+					$temp_coupon->set_props( (array) $coupon_meta );
+
+				}
+			}
+
+			$data['discount_type']  = $temp_coupon->get_discount_type();
+			$data['nominal_amount'] = (float) $temp_coupon->get_amount();
+			$data['free_shipping']  = $temp_coupon->get_free_shipping();
+		}
+
+		$data['meta_data'] = array_map(
+			array( $this, 'merge_meta_item_with_formatted_meta_display_attributes' ),
+			$data['meta_data'],
+			array_fill( 0, count( $data['meta_data'] ), $formatted_meta_data )
+		);
+
 		return $data;
+	}
+
+	/**
+	 * Merge the `$formatted_meta_data` `display_key` and `display_value` attribute values into the corresponding
+	 * {@link WC_Meta_Data}. Returns the merged array.
+	 *
+	 * @param WC_Meta_Data $meta_item           An object from {@link WC_Order_Item::get_meta_data()}.
+	 * @param array        $formatted_meta_data An object result from {@link WC_Order_Item::get_all_formatted_meta_data}.
+	 * The keys are the IDs of {@link WC_Meta_Data}.
+	 *
+	 * @return array
+	 */
+	private function merge_meta_item_with_formatted_meta_display_attributes( $meta_item, $formatted_meta_data ) {
+		$result = array(
+			'id'            => $meta_item->id,
+			'key'           => $meta_item->key,
+			'value'         => $meta_item->value,
+			'display_key'   => $meta_item->key,   // Default to original key, in case a formatted key is not available.
+			'display_value' => $meta_item->value, // Default to original value, in case a formatted value is not available.
+		);
+
+		if ( array_key_exists( $meta_item->id, $formatted_meta_data ) ) {
+			$formatted_meta_item = $formatted_meta_data[ $meta_item->id ];
+
+			$result['display_key'] = wc_clean( $formatted_meta_item->display_key );
+			$result['display_value'] = wc_clean( $formatted_meta_item->display_value );
+		}
+
+		return $result;
 	}
 
 	/**
 	 * Get formatted item data.
 	 *
-	 * @since  WC-3.0.0
-	 * @param  WC_Data $object WC_Data instance.
+	 * @since 3.0.0
+	 * @param WC_Order $order WC_Data instance.
+	 *
 	 * @return array
 	 */
-	protected function get_formatted_item_data( $object ) {
-		$data              = $object->get_data();
-		$format_decimal    = array( 'discount_total', 'discount_tax', 'shipping_total', 'shipping_tax', 'shipping_total', 'shipping_tax', 'cart_tax', 'total', 'total_tax' );
-		$format_date       = array( 'date_created', 'date_modified', 'date_completed', 'date_paid' );
+	protected function get_formatted_item_data( $order ) {
+		$extra_fields   = array( 'meta_data', 'line_items', 'tax_lines', 'shipping_lines', 'fee_lines', 'coupon_lines', 'refunds', 'payment_url' );
+		$format_decimal = array( 'discount_total', 'discount_tax', 'shipping_total', 'shipping_tax', 'shipping_total', 'shipping_tax', 'cart_tax', 'total', 'total_tax' );
+		$format_date    = array( 'date_created', 'date_modified', 'date_completed', 'date_paid' );
+		// These fields are dependent on other fields.
+		$dependent_fields = array(
+			'date_created_gmt'   => 'date_created',
+			'date_modified_gmt'  => 'date_modified',
+			'date_completed_gmt' => 'date_completed',
+			'date_paid_gmt'      => 'date_paid',
+		);
+
 		$format_line_items = array( 'line_items', 'tax_lines', 'shipping_lines', 'fee_lines', 'coupon_lines' );
+
+		// Only fetch fields that we need.
+		$fields = $this->get_fields_for_response( $this->request );
+		foreach ( $dependent_fields as $field_key => $dependency ) {
+			if ( in_array( $field_key, $fields ) && ! in_array( $dependency, $fields ) ) {
+				$fields[] = $dependency;
+			}
+		}
+
+		$extra_fields      = array_intersect( $extra_fields, $fields );
+		$format_decimal    = array_intersect( $format_decimal, $fields );
+		$format_date       = array_intersect( $format_date, $fields );
+
+		$format_line_items = array_intersect( $format_line_items, $fields );
+
+		$data = $order->get_base_data();
+
+		// Add extra data as necessary.
+		foreach ( $extra_fields as $field ) {
+			switch ( $field ) {
+				case 'meta_data':
+					$meta_data         = $order->get_meta_data();
+					$data['meta_data'] = $this->get_meta_data_for_response( $this->request, $meta_data );
+					break;
+				case 'line_items':
+					$data['line_items'] = $order->get_items( 'line_item' );
+					break;
+				case 'tax_lines':
+					$data['tax_lines'] = $order->get_items( 'tax' );
+					break;
+				case 'shipping_lines':
+					$data['shipping_lines'] = $order->get_items( 'shipping' );
+					break;
+				case 'fee_lines':
+					$data['fee_lines'] = $order->get_items( 'fee' );
+					break;
+				case 'coupon_lines':
+					$data['coupon_lines'] = $order->get_items( 'coupon' );
+					break;
+				case 'refunds':
+					$data['refunds'] = array();
+					foreach ( $order->get_refunds() as $refund ) {
+						$data['refunds'][] = array(
+							'id'     => $refund->get_id(),
+							'reason' => $refund->get_reason() ? $refund->get_reason() : '',
+							'total'  => '-' . wc_format_decimal( $refund->get_amount(), $this->request['dp'] ),
+                        );
+					}
+                    break;
+                case 'payment_url':
+					$data['payment_url'] = $order->get_checkout_payment_url();
+					break;
+			}
+		}
 
 		// Format decimal values.
 		foreach ( $format_decimal as $key ) {
@@ -227,65 +391,60 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 			$data[ $key ] = array_values( array_map( array( $this, 'get_order_item_data' ), $data[ $key ] ) );
 		}
 
-		// Refunds.
-		$data['refunds'] = array();
-		foreach ( $object->get_refunds() as $refund ) {
-			$data['refunds'][] = array(
-				'id'     => $refund->get_id(),
-				'reason' => $refund->get_reason() ? $refund->get_reason() : '',
-				'total'  => '-' . wc_format_decimal( $refund->get_amount(), $this->request['dp'] ),
-			);
-		}
-
-		return array(
-			'id'                   => $object->get_id(),
-			'parent_id'            => $data['parent_id'],
-			'number'               => $data['number'],
-			'order_key'            => $data['order_key'],
-			'created_via'          => $data['created_via'],
-			'version'              => $data['version'],
-			'status'               => $data['status'],
-			'currency'             => $data['currency'],
-			'date_created'         => $data['date_created'],
-			'date_created_gmt'     => $data['date_created_gmt'],
-			'date_modified'        => $data['date_modified'],
-			'date_modified_gmt'    => $data['date_modified_gmt'],
-			'discount_total'       => $data['discount_total'],
-			'discount_tax'         => $data['discount_tax'],
-			'shipping_total'       => $data['shipping_total'],
-			'shipping_tax'         => $data['shipping_tax'],
-			'cart_tax'             => $data['cart_tax'],
-			'total'                => $data['total'],
-			'total_tax'            => $data['total_tax'],
-			'prices_include_tax'   => $data['prices_include_tax'],
-			'customer_id'          => $data['customer_id'],
-			'customer_ip_address'  => $data['customer_ip_address'],
-			'customer_user_agent'  => $data['customer_user_agent'],
-			'customer_note'        => $data['customer_note'],
-			'billing'              => $data['billing'],
-			'shipping'             => $data['shipping'],
-			'payment_method'       => $data['payment_method'],
-			'payment_method_title' => $data['payment_method_title'],
-			'transaction_id'       => $data['transaction_id'],
-			'date_paid'            => $data['date_paid'],
-			'date_paid_gmt'        => $data['date_paid_gmt'],
-			'date_completed'       => $data['date_completed'],
-			'date_completed_gmt'   => $data['date_completed_gmt'],
-			'cart_hash'            => $data['cart_hash'],
-			'meta_data'            => $data['meta_data'],
-			'line_items'           => $data['line_items'],
-			'tax_lines'            => $data['tax_lines'],
-			'shipping_lines'       => $data['shipping_lines'],
-			'fee_lines'            => $data['fee_lines'],
-			'coupon_lines'         => $data['coupon_lines'],
-			'refunds'              => $data['refunds'],
+		$allowed_fields = array(
+			'id',
+			'parent_id',
+			'number',
+			'order_key',
+			'created_via',
+			'version',
+			'status',
+			'currency',
+			'date_created',
+			'date_created_gmt',
+			'date_modified',
+			'date_modified_gmt',
+			'discount_total',
+			'discount_tax',
+			'shipping_total',
+			'shipping_tax',
+			'cart_tax',
+			'total',
+			'total_tax',
+			'prices_include_tax',
+			'customer_id',
+			'customer_ip_address',
+			'customer_user_agent',
+			'customer_note',
+			'billing',
+			'shipping',
+			'payment_method',
+			'payment_method_title',
+			'transaction_id',
+			'date_paid',
+			'date_paid_gmt',
+			'date_completed',
+			'date_completed_gmt',
+			'cart_hash',
+			'meta_data',
+			'line_items',
+			'tax_lines',
+			'shipping_lines',
+			'fee_lines',
+			'coupon_lines',
+			'refunds',
+            'payment_url',
 		);
+
+		$data = array_intersect_key( $data, array_flip( $allowed_fields ) );
+
+		return $data;
 	}
 
 	/**
 	 * Prepare a single order output for response.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WC_Data         $object  Object data.
 	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response
@@ -293,10 +452,10 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 	public function prepare_object_for_response( $object, $request ) {
 		$this->request       = $request;
 		$this->request['dp'] = is_null( $this->request['dp'] ) ? wc_get_price_decimals() : absint( $this->request['dp'] );
+		$request['context']  = ! empty( $request['context'] ) ? $request['context'] : 'view';
 		$data                = $this->get_formatted_item_data( $object );
-		$context             = ! empty( $request['context'] ) ? $request['context'] : 'view';
 		$data                = $this->add_additional_fields_to_object( $data, $request );
-		$data                = $this->filter_response_by_context( $data, $context );
+		$data                = $this->filter_response_by_context( $data, $request['context'] );
 		$response            = rest_ensure_response( $data );
 		$response->add_links( $this->prepare_links( $object, $request ) );
 
@@ -348,7 +507,7 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 	/**
 	 * Prepare objects query.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WP_REST_Request $request Full details about the request.
 	 * @return array
 	 */
@@ -368,7 +527,7 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 
 		if ( isset( $request['customer'] ) ) {
 			if ( ! empty( $args['meta_query'] ) ) {
-				$args['meta_query'] = array(); // WPCS: slow query ok.
+				$args['meta_query'] = array(); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 			}
 
 			$args['meta_query'][] = array(
@@ -382,12 +541,11 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 		if ( ! empty( $request['product'] ) ) {
 			$order_ids = $wpdb->get_col(
 				$wpdb->prepare(
-					"
-				SELECT order_id
-				FROM {$wpdb->prefix}woocommerce_order_items
-				WHERE order_item_id IN ( SELECT order_item_id FROM {$wpdb->prefix}woocommerce_order_itemmeta WHERE meta_key = '_product_id' AND meta_value = %d )
-				AND order_item_type = 'line_item'
-			 ", $request['product']
+					"SELECT order_id
+					FROM {$wpdb->prefix}woocommerce_order_items
+					WHERE order_item_id IN ( SELECT order_item_id FROM {$wpdb->prefix}woocommerce_order_itemmeta WHERE meta_key = '_product_id' AND meta_value = %d )
+					AND order_item_type = 'line_item'",
+					$request['product']
 				)
 			);
 
@@ -504,7 +662,7 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 	/**
 	 * Save an object data.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @throws WC_REST_Exception But all errors are validated before returning any data.
 	 * @param  WP_REST_Request $request  Full details about the request.
 	 * @param  bool            $creating If is creating a new object.
@@ -529,13 +687,14 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 
 				// Make sure customer is part of blog.
 				if ( is_multisite() && ! is_user_member_of_blog( $request['customer_id'] ) ) {
-					throw new WC_REST_Exception( 'woocommerce_rest_invalid_customer_id_network', __( 'Customer ID does not belong to this site.', 'classic-commerce' ), 400 );
+					add_user_to_blog( get_current_blog_id(), $request['customer_id'], 'customer' );
 				}
 			}
 
 			if ( $creating ) {
 				$object->set_created_via( 'rest-api' );
 				$object->set_prices_include_tax( 'yes' === get_option( 'woocommerce_prices_include_tax' ) );
+                $object->save();
 				$object->calculate_totals();
 			} else {
 				// If items have changed, recalculate order totals.
@@ -585,16 +744,19 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 	 * Gets the product ID from the SKU or posted ID.
 	 *
 	 * @throws WC_REST_Exception When SKU or ID is not valid.
-	 * @param array $posted Request data.
+	 * @param array  $posted Request data.
+	 * @param string $action 'create' to add line item or 'update' to update it.
 	 * @return int
 	 */
-	protected function get_product_id( $posted ) {
+	protected function get_product_id( $posted, $action = 'create' ) {
 		if ( ! empty( $posted['sku'] ) ) {
 			$product_id = (int) wc_get_product_id_by_sku( $posted['sku'] );
 		} elseif ( ! empty( $posted['product_id'] ) && empty( $posted['variation_id'] ) ) {
 			$product_id = (int) $posted['product_id'];
 		} elseif ( ! empty( $posted['variation_id'] ) ) {
 			$product_id = (int) $posted['variation_id'];
+		} elseif ( 'update' === $action ) {
+			$product_id = 0;
 		} else {
 			throw new WC_REST_Exception( 'woocommerce_rest_required_product_reference', __( 'Product ID or SKU is required.', 'classic-commerce' ), 400 );
 		}
@@ -655,9 +817,9 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 	 */
 	protected function prepare_line_items( $posted, $action = 'create', $item = null ) {
 		$item    = is_null( $item ) ? new WC_Order_Item_Product( ! empty( $posted['id'] ) ? $posted['id'] : '' ) : $item;
-		$product = wc_get_product( $this->get_product_id( $posted ) );
+		$product = wc_get_product( $this->get_product_id( $posted, $action ) );
 
-		if ( $product !== $item->get_product() ) {
+		if ( $product && $product !== $item->get_product() ) {
 			$item->set_product( $product );
 
 			if ( 'create' === $action ) {
@@ -670,6 +832,11 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 
 		$this->maybe_set_item_props( $item, array( 'name', 'quantity', 'total', 'subtotal', 'tax_class' ), $posted );
 		$this->maybe_set_item_meta_data( $item, $posted );
+
+        if ( 'update' === $action ) {
+			require_once WC_ABSPATH . 'includes/admin/wc-admin-functions.php';
+			wc_maybe_adjust_line_item_product_stock( $item );
+		}
 
 		return $item;
 	}
@@ -692,7 +859,7 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 			}
 		}
 
-		$this->maybe_set_item_props( $item, array( 'method_id', 'method_title', 'total' ), $posted );
+		$this->maybe_set_item_props( $item, array( 'method_id', 'method_title', 'total', 'instance_id' ), $posted );
 		$this->maybe_set_item_meta_data( $item, $posted );
 
 		return $item;
@@ -735,7 +902,8 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 		$item = is_null( $item ) ? new WC_Order_Item_Coupon( ! empty( $posted['id'] ) ? $posted['id'] : '' ) : $item;
 
 		if ( 'create' === $action ) {
-			if ( empty( $posted['code'] ) ) {
+			$coupon_code = ArrayUtil::get_value_or_default( $posted, 'code' );
+			if ( StringUtil::is_null_or_whitespace( $coupon_code ) ) {
 				throw new WC_REST_Exception( 'woocommerce_rest_invalid_coupon_coupon', __( 'Coupon code is required.', 'classic-commerce' ), 400 );
 			}
 		}
@@ -815,7 +983,7 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 	 * @return array
 	 */
 	protected function get_order_statuses() {
-		$order_statuses = array();
+		$order_statuses = array( 'auto-draft' );
 
 		foreach ( array_keys( wc_get_order_statuses() ) as $status ) {
 			$order_statuses[] = str_replace( 'wc-', '', $status );
@@ -866,7 +1034,7 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 				),
 				'version'              => array(
 					'description' => __( 'Version of Classic Commerce which last updated the order.', 'classic-commerce' ),
-					'type'        => 'integer',
+					'type'        => 'string',
 					'context'     => array( 'view', 'edit' ),
 					'readonly'    => true,
 				),
@@ -1031,7 +1199,7 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 						),
 						'email'      => array(
 							'description' => __( 'Email address.', 'classic-commerce' ),
-							'type'        => 'string',
+							'type'        => array( 'string', 'null' ),
 							'format'      => 'email',
 							'context'     => array( 'view', 'edit' ),
 						),
@@ -1186,6 +1354,11 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 								'type'        => 'mixed',
 								'context'     => array( 'view', 'edit' ),
 							),
+							'parent_name'  => array(
+								'description' => __( 'Parent product name if the product is a variation.', 'classic-commerce' ),
+								'type'        => 'string',
+								'context'     => array( 'view', 'edit' ),
+							),
 							'product_id'   => array(
 								'description' => __( 'Product ID.', 'classic-commerce' ),
 								'type'        => 'mixed',
@@ -1261,20 +1434,30 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 								'items'       => array(
 									'type'       => 'object',
 									'properties' => array(
-										'id'    => array(
+										'id'            => array(
 											'description' => __( 'Meta ID.', 'classic-commerce' ),
 											'type'        => 'integer',
 											'context'     => array( 'view', 'edit' ),
 											'readonly'    => true,
 										),
-										'key'   => array(
+										'key'           => array(
 											'description' => __( 'Meta key.', 'classic-commerce' ),
 											'type'        => 'string',
 											'context'     => array( 'view', 'edit' ),
 										),
-										'value' => array(
+										'value'         => array(
 											'description' => __( 'Meta value.', 'classic-commerce' ),
 											'type'        => 'mixed',
+											'context'     => array( 'view', 'edit' ),
+										),
+										'display_key'   => array(
+											'description' => __( 'Meta key for UI display.', 'classic-commerce' ),
+											'type'        => 'string',
+											'context'     => array( 'view', 'edit' ),
+										),
+										'display_value' => array(
+											'description' => __( 'Meta value for UI display.', 'classic-commerce' ),
+											'type'        => 'string',
 											'context'     => array( 'view', 'edit' ),
 										),
 									),
@@ -1292,6 +1475,25 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 								'context'     => array( 'view', 'edit' ),
 								'readonly'    => true,
 							),
+                            'image'        => array(
+								'description' => __( 'Properties of the main product image.', 'classic-commerce' ),
+								'type'        => 'object',
+								'context'     => array( 'view', 'edit' ),
+								'readonly'    => true,
+								'properties'  => array(
+                                        'id'  => array(
+										'description' => __( 'Image ID.', 'classic-commerce' ),
+										'type'        => 'integer',
+										'context'     => array( 'view', 'edit' ),
+									),
+									'src' => array(
+										'description' => __( 'Image URL.', 'classic-commerce' ),
+										'type'        => 'string',
+										'format'      => 'uri',
+										'context'     => array( 'view', 'edit' ),
+									),
+                                ),
+                            ),
 						),
 					),
 				),
@@ -1317,7 +1519,7 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 							),
 							'rate_id'            => array(
 								'description' => __( 'Tax rate ID.', 'classic-commerce' ),
-								'type'        => 'string',
+								'type'        => 'integer',
 								'context'     => array( 'view', 'edit' ),
 								'readonly'    => true,
 							),
@@ -1650,6 +1852,12 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 						),
 					),
 				),
+                'payment_url' => array(
+					'description' => __( 'Order payment URL.', 'woocommerce' ),
+					'type'        => 'string',
+					'context'     => array( 'view', 'edit' ),
+					'readonly'    => true,
+				),
 				'set_paid'             => array(
 					'description' => __( 'Define if the order is paid. It will set the status to processing and reduce stock items.', 'classic-commerce' ),
 					'type'        => 'boolean',
@@ -1696,6 +1904,24 @@ class WC_REST_Orders_V2_Controller extends WC_REST_Legacy_Orders_Controller {
 			'type'              => 'integer',
 			'sanitize_callback' => 'absint',
 			'validate_callback' => 'rest_validate_request_arg',
+		);
+        $params['include_meta']            = array(
+			'default'           => array(),
+			'description'       => __( 'Limit meta_data to specific keys.', 'classic-commerce' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type' => 'string',
+			),
+			'sanitize_callback' => 'wp_parse_list',
+		);
+		$params['exclude_meta']            = array(
+			'default'           => array(),
+			'description'       => __( 'Ensure meta_data excludes specific keys.', 'classic-commerce' ),
+			'type'              => 'array',
+			'items'             => array(
+				'type' => 'string',
+			),
+			'sanitize_callback' => 'wp_parse_list',
 		);
 
 		return $params;

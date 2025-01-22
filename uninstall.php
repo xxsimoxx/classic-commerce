@@ -18,7 +18,6 @@ wp_clear_scheduled_hook( 'woocommerce_cleanup_sessions' );
 wp_clear_scheduled_hook( 'woocommerce_cleanup_personal_data' );
 wp_clear_scheduled_hook( 'woocommerce_cleanup_logs' );
 wp_clear_scheduled_hook( 'woocommerce_geoip_updater' );
-wp_clear_scheduled_hook( 'woocommerce_tracker_send_event' );
 
 /*
  * Only remove ALL product and page data if WC_REMOVE_ALL_DATA constant is set to true in user's
@@ -26,7 +25,8 @@ wp_clear_scheduled_hook( 'woocommerce_tracker_send_event' );
  * and to ensure only the site owner can perform this action.
  */
 if ( defined( 'WC_REMOVE_ALL_DATA' ) && true === WC_REMOVE_ALL_DATA ) {
-	include_once dirname( __FILE__ ) . '/includes/class-wc-install.php';
+	// Load Classic Commerce so we can access the container, install routines, etc, during uninstall.
+	require_once __DIR__ . '/classic-commerce.php';
 
 	// Roles + caps.
 	WC_Install::remove_roles();

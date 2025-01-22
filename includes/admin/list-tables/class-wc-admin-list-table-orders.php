@@ -3,7 +3,7 @@
  * List tables: orders.
  *
  * @package ClassicCommerce\admin
- * @version WC-3.3.0
+ * @version 3.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -15,7 +15,7 @@ if ( class_exists( 'WC_Admin_List_Table_Orders', false ) ) {
 }
 
 if ( ! class_exists( 'WC_Admin_List_Table', false ) ) {
-	include_once 'abstract-class-wc-admin-list-table.php';
+	include_once __DIR__ . '/abstract-class-wc-admin-list-table.php';
 }
 
 /**
@@ -47,8 +47,15 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 	 */
 	protected function render_blank_state() {
 		echo '<div class="woocommerce-BlankState">';
+
 		echo '<h2 class="woocommerce-BlankState-message">' . esc_html__( 'When you receive a new order, it will appear here.', 'classic-commerce' ) . '</h2>';
+
+		echo '<div class="woocommerce-BlankState-buttons">';
 		echo '<a class="woocommerce-BlankState-cta button-primary button" target="_blank" href="https://classiccommerce.cc/usage-and-maintenance/managing-orders/">' . esc_html__( 'Learn more about orders', 'classic-commerce' ) . '</a>';
+		echo '</div>';
+
+		do_action( 'wc_marketplace_suggestions_orders_empty_state' );
+
 		echo '</div>';
 	}
 
@@ -135,10 +142,14 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 			unset( $actions['edit'] );
 		}
 
-		$actions['mark_processing']      = __( 'Change status to processing', 'classic-commerce' );
-		$actions['mark_on-hold']         = __( 'Change status to on-hold', 'classic-commerce' );
-		$actions['mark_completed']       = __( 'Change status to completed', 'classic-commerce' );
-		$actions['remove_personal_data'] = __( 'Remove personal data', 'classic-commerce' );
+		$actions['mark_processing'] = __( 'Change status to processing', 'classic-commerce' );
+		$actions['mark_on-hold']    = __( 'Change status to on-hold', 'classic-commerce' );
+		$actions['mark_completed']  = __( 'Change status to completed', 'classic-commerce' );
+        $actions['mark_cancelled']  = __( 'Change status to cancelled', 'classic-commerce' );
+
+		if ( wc_string_to_bool( get_option( 'woocommerce_allow_bulk_remove_personal_data', 'no' ) ) ) {
+			$actions['remove_personal_data'] = __( 'Remove personal data', 'classic-commerce' );
+		}
 
 		return $actions;
 	}
@@ -172,6 +183,15 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 			$user  = get_user_by( 'id', $this->object->get_customer_id() );
 			$buyer = ucwords( $user->display_name );
 		}
+
+		/**
+		 * Filter buyer name in list table orders.
+		 *
+		 * @since 3.7.0
+		 * @param string   $buyer Buyer name.
+		 * @param WC_Order $order Order data.
+		 */
+		$buyer = apply_filters( 'woocommerce_admin_order_buyer_name', $buyer, $this->object );
 
 		if ( $this->object->get_status() === 'trash' ) {
 			echo '<strong>#' . esc_attr( $this->object->get_order_number() ) . ' ' . esc_html( $buyer ) . '</strong>';
@@ -319,7 +339,7 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 		$address = $this->object->get_formatted_shipping_address();
 
 		if ( $address ) {
-			echo '<a target="_blank" href="' . esc_url( $this->object->get_shipping_address_map_url() ) . '">' . esc_html( preg_replace( '#<br\s*/?>#i', ', ', $address ) ) . '</a>';
+			echo '<a target="_blank" href="' . esc_url( $this->object->get_shipping_address_map_url() ) . '">' . preg_replace( '#<br\s*/?>#i', ', ', $address ) . '</a>';
 			if ( $this->object->get_shipping_method() ) {
 				/* translators: %s: shipping method */
 				echo '<span class="description">' . sprintf( __( 'via %s', 'classic-commerce' ), esc_html( $this->object->get_shipping_method() ) ) . '</span>'; // WPCS: XSS ok.
@@ -332,7 +352,7 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 	/**
 	 * Template for order preview.
 	 *
-	 * @since WC-3.3.0
+	 * @since 3.3.0
 	 */
 	public function order_preview_template() {
 		?>
@@ -422,7 +442,8 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 	 */
 	public static function get_order_preview_item_html( $order ) {
 		$hidden_order_itemmeta = apply_filters(
-			'woocommerce_hidden_order_itemmeta', array(
+			'woocommerce_hidden_order_itemmeta',
+			array(
 				'_qty',
 				'_tax_class',
 				'_product_id',
@@ -439,12 +460,14 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 
 		$line_items = apply_filters( 'woocommerce_admin_order_preview_line_items', $order->get_items(), $order );
 		$columns    = apply_filters(
-			'woocommerce_admin_order_preview_line_item_columns', array(
+			'woocommerce_admin_order_preview_line_item_columns',
+			array(
 				'product'  => __( 'Product', 'classic-commerce' ),
 				'quantity' => __( 'Quantity', 'classic-commerce' ),
 				'tax'      => __( 'Tax', 'classic-commerce' ),
 				'total'    => __( 'Total', 'classic-commerce' ),
-			), $order
+			),
+			$order
 		);
 
 		if ( ! wc_tax_enabled() ) {
@@ -483,7 +506,7 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 							$html .= '<div class="wc-order-item-sku">' . esc_html( $product_object->get_sku() ) . '</div>';
 						}
 
-						$meta_data = $item->get_formatted_meta_data( '' );
+						$meta_data = $item->get_all_formatted_meta_data( '' );
 
 						if ( $meta_data ) {
 							$html .= '<table cellspacing="0" class="wc-order-item-meta">';
@@ -602,11 +625,12 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 		$shipping_address = $order->get_formatted_shipping_address();
 
 		return apply_filters(
-			'woocommerce_admin_order_preview_get_order_details', array(
+			'woocommerce_admin_order_preview_get_order_details',
+			array(
 				'data'                       => $order->get_data(),
 				'order_number'               => $order->get_order_number(),
-				'item_html'                  => WC_Admin_List_Table_Orders::get_order_preview_item_html( $order ),
-				'actions_html'               => WC_Admin_List_Table_Orders::get_order_preview_actions_html( $order ),
+				'item_html'                  => self::get_order_preview_item_html( $order ),
+				'actions_html'               => self::get_order_preview_actions_html( $order ),
 				'ship_to_billing'            => wc_ship_to_billing_address_only(),
 				'needs_shipping'             => $order->needs_shipping_address(),
 				'formatted_billing_address'  => $billing_address ? $billing_address : __( 'N/A', 'classic-commerce' ),
@@ -616,7 +640,8 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 				'shipping_via'               => $order->get_shipping_method(),
 				'status'                     => $order->get_status(),
 				'status_name'                => wc_get_order_status_name( $order->get_status() ),
-			), $order
+			),
+			$order
 		);
 	}
 
@@ -651,7 +676,7 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 			// Sanity check: bail out if this is actually not a status, or is not a registered status.
 			if ( isset( $order_statuses[ 'wc-' . $new_status ] ) ) {
 				// Initialize payment gateways in case order has hooked status transition actions.
-				wc()->payment_gateways();
+				WC()->payment_gateways();
 
 				foreach ( $ids as $id ) {
 					$order = wc_get_order( $id );
@@ -669,7 +694,8 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 					'bulk_action' => $report_action,
 					'changed'     => $changed,
 					'ids'         => join( ',', $ids ),
-				), $redirect_to
+				),
+				$redirect_to
 			);
 		}
 
@@ -695,7 +721,7 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 		foreach ( $order_statuses as $slug => $name ) {
 			if ( 'marked_' . str_replace( 'wc-', '', $slug ) === $bulk_action ) { // WPCS: input var ok, CSRF ok.
 				/* translators: %d: orders count */
-				$message = sprintf( _n( '%d order status changed.', '%d order statuses changed.', $number, 'classic-commerce' ), number_format_i18n( $number ) );
+				$message = sprintf( _n( '%s order status changed.', '%s order statuses changed.', $number, 'classic-commerce' ), number_format_i18n( $number ) );
 				echo '<div class="updated"><p>' . esc_html( $message ) . '</p></div>';
 				break;
 			}
@@ -703,7 +729,7 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 
 		if ( 'removed_personal_data' === $bulk_action ) { // WPCS: input var ok, CSRF ok.
 			/* translators: %d: orders count */
-			$message = sprintf( _n( 'Removed personal data from %d order.', 'Removed personal data from %d orders.', $number, 'classic-commerce' ), number_format_i18n( $number ) );
+			$message = sprintf( _n( 'Removed personal data from %s order.', 'Removed personal data from %s orders.', $number, 'classic-commerce' ), number_format_i18n( $number ) );
 			echo '<div class="updated"><p>' . esc_html( $message ) . '</p></div>';
 		}
 	}
@@ -726,7 +752,7 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 		$user_string = '';
 		$user_id     = '';
 
-		if ( ! empty( $_GET['_customer_user'] ) ) { // WPCS: input var ok.
+		if ( ! empty( $_GET['_customer_user'] ) ) { // phpcs:disable  WordPress.Security.NonceVerification.NoNonceVerification
 			$user_id = absint( $_GET['_customer_user'] ); // WPCS: input var ok, sanitization ok.
 			$user    = get_user_by( 'id', $user_id );
 
@@ -740,7 +766,7 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 		}
 		?>
 		<select class="wc-customer-search" name="_customer_user" data-placeholder="<?php esc_attr_e( 'Filter by registered customer', 'classic-commerce' ); ?>" data-allow_clear="true">
-			<option value="<?php echo esc_attr( $user_id ); ?>" selected="selected"><?php echo wp_kses_post( $user_string ); ?><option>
+			<option value="<?php echo esc_attr( $user_id ); ?>" selected="selected"><?php echo htmlspecialchars( wp_kses_post( $user_string ) ); // htmlspecialchars to prevent XSS when rendered by selectWoo. ?></option>
 		</select>
 		<?php
 	}
@@ -772,11 +798,11 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 
 		// Filter the orders by the posted customer.
 		if ( ! empty( $_GET['_customer_user'] ) ) { // WPCS: input var ok.
-			// @codingStandardsIgnoreStart
+			// @codingStandardsIgnoreStart.
 			$query_vars['meta_query'] = array(
 				array(
-					'key'   => '_customer_user',
-					'value' => (int) $_GET['_customer_user'], // WPCS: input var ok, sanitization ok.
+					'key'     => '_customer_user',
+					'value'   => (int) $_GET['_customer_user'], // WPCS: input var ok, sanitization ok.
 					'compare' => '=',
 				),
 			);
@@ -819,7 +845,7 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 	public function search_label( $query ) {
 		global $pagenow, $typenow;
 
-		if ( 'edit.php' !== $pagenow || 'shop_order' !== $typenow || ! get_query_var( 'shop_order_search' ) || ! isset( $_GET['s'] ) ) { // WPCS: input var ok.
+		if ( 'edit.php' !== $pagenow || 'shop_order' !== $typenow || ! get_query_var( 'shop_order_search' ) || ! isset( $_GET['s'] ) ) { // phpcs:disable  WordPress.Security.NonceVerification.NoNonceVerification
 			return $query;
 		}
 
@@ -845,11 +871,11 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 	public function search_custom_fields( $wp ) {
 		global $pagenow;
 
-		if ( 'edit.php' !== $pagenow || empty( $wp->query_vars['s'] ) || 'shop_order' !== $wp->query_vars['post_type'] || ! isset( $_GET['s'] ) ) { // WPCS: input var ok.
+		if ( 'edit.php' !== $pagenow || 'shop_order' !== $wp->query_vars['post_type'] ) { // phpcs:ignore  WordPress.Security.NonceVerification.Recommended
 			return;
 		}
 
-		$post_ids = wc_order_search( wc_clean( wp_unslash( $_GET['s'] ) ) ); // WPCS: input var ok, sanitization ok.
+		$post_ids = isset( $_GET['s'] ) && ! empty( $wp->query_vars['s'] ) ? wc_order_search( wc_clean( wp_unslash( $_GET['s'] ) ) ) : array(); // phpcs:ignore  WordPress.Security.NonceVerification.Recommended
 
 		if ( ! empty( $post_ids ) ) {
 			// Remove "s" - we don't want to search order name.
@@ -860,6 +886,24 @@ class WC_Admin_List_Table_Orders extends WC_Admin_List_Table {
 
 			// Search by found posts.
 			$wp->query_vars['post__in'] = array_merge( $post_ids, array( 0 ) );
+		}
+
+        if ( isset( $_GET['order_date_type'] ) && isset( $_GET['m'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$date_type  = wc_clean( wp_unslash( $_GET['order_date_type'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$date_query = wc_clean( wp_unslash( $_GET['m'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			// date_paid and date_completed are stored in postmeta, so we need to do a meta query.
+			if ( 'date_paid' === $date_type || 'date_completed' === $date_type ) {
+				$date_start = \DateTime::createFromFormat( 'Ymd H:i:s', "$date_query 00:00:00" );
+				$date_end   = \DateTime::createFromFormat( 'Ymd H:i:s', "$date_query 23:59:59" );
+
+				unset( $wp->query_vars['m'] );
+
+				if ( $date_start && $date_end ) {
+					$wp->query_vars['meta_key']     = "_$date_type"; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+					$wp->query_vars['meta_value']   = array( strval( $date_start->getTimestamp() ), strval( $date_end->getTimestamp() ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+					$wp->query_vars['meta_compare'] = 'BETWEEN';
+				}
+			}
 		}
 	}
 }

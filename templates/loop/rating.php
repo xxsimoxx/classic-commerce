@@ -7,7 +7,7 @@
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @author  WooThemes
  * @package ClassicCommerce/Templates
- * @version WC-3.0.0
+ * @version WC-3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -16,8 +16,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 global $product;
 
-if ( get_option( 'woocommerce_enable_review_rating' ) === 'no' ) {
+if ( ! wc_review_ratings_enabled() ) {
 	return;
 }
 
-echo wc_get_rating_html( $product->get_average_rating() );
+echo wc_get_rating_html( $product->get_average_rating() ); // WordPress.XSS.EscapeOutput.OutputNotEscaped.

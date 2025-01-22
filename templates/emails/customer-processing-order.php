@@ -6,7 +6,7 @@
  *
  * @see     https://classiccommerce.cc/docs/installation-and-setup/template-structure/
  * @package ClassicCommerce/Templates/Emails
- * @version WC-3.5.0
+ * @version WC-3.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -44,11 +44,12 @@ do_action( 'woocommerce_email_order_meta', $order, $sent_to_admin, $plain_text, 
  */
 do_action( 'woocommerce_email_customer_details', $order, $sent_to_admin, $plain_text, $email );
 
-?>
-<p>
-<?php esc_html_e( 'Thanks!', 'classic-commerce' ); ?>
-</p>
-<?php
+/**
+ * Show user-defined additonal content - this is set in each email's settings.
+ */
+if ( $additional_content ) {
+	echo wp_kses_post( wpautop( wptexturize( $additional_content ) ) );
+}
 
 /*
  * @hooked WC_Emails::email_footer() Output the email footer

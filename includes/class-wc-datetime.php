@@ -44,7 +44,7 @@ class WC_DateTime extends DateTime {
 	/**
 	 * Get UTC offset if set, or default to the DateTime object's offset.
 	 */
-	public function getOffset() {
+	public function getOffset() : int {
 		return $this->utc_offset ? $this->utc_offset : parent::getOffset();
 	}
 
@@ -54,7 +54,7 @@ class WC_DateTime extends DateTime {
 	 * @param DateTimeZone $timezone DateTimeZone instance.
 	 * @return DateTime
 	 */
-	public function setTimezone( $timezone ) {
+	public function setTimezone( $timezone ) : DateTime {
 		$this->utc_offset = 0;
 		return parent::setTimezone( $timezone );
 	}
@@ -65,7 +65,7 @@ class WC_DateTime extends DateTime {
 	 * @since  WC-3.0.0
 	 * @return int
 	 */
-	public function getTimestamp() {
+	public function getTimestamp() : int {
 		return method_exists( 'DateTime', 'getTimestamp' ) ? parent::getTimestamp() : $this->format( 'U' );
 	}
 

@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Handles Refunds and other API requests such as capture.
  *
- * @since WC-3.0.0
+ * @since 3.0.0
  */
 class WC_Gateway_Paypal_API_Handler {
 
@@ -108,17 +108,17 @@ class WC_Gateway_Paypal_API_Handler {
 				'method'      => 'POST',
 				'body'        => self::get_capture_request( $order, $amount ),
 				'timeout'     => 70,
-				'user-agent'  => WooCommerce::user_agent_header(),
+				'user-agent'  => 'WooCommerce/' . WC()->version,
 				'httpversion' => '1.1',
 			)
 		);
 
 		WC_Gateway_Paypal::log( 'DoCapture Response: ' . wc_print_r( $raw_response, true ) );
 
-		if ( empty( $raw_response['body'] ) ) {
-			return new WP_Error( 'paypal-api', 'Empty Response' );
-		} elseif ( is_wp_error( $raw_response ) ) {
+		if ( is_wp_error( $raw_response ) ) {
 			return $raw_response;
+		} elseif ( empty( $raw_response['body'] ) ) {
+			return new WP_Error( 'paypal-api', 'Empty Response' );
 		}
 
 		parse_str( $raw_response['body'], $response );
@@ -141,17 +141,17 @@ class WC_Gateway_Paypal_API_Handler {
 				'method'      => 'POST',
 				'body'        => self::get_refund_request( $order, $amount, $reason ),
 				'timeout'     => 70,
-				'user-agent'  => WooCommerce::user_agent_header(),
+				'user-agent'  => 'WooCommerce/' . WC()->version,
 				'httpversion' => '1.1',
 			)
 		);
 
 		WC_Gateway_Paypal::log( 'Refund Response: ' . wc_print_r( $raw_response, true ) );
 
-		if ( empty( $raw_response['body'] ) ) {
-			return new WP_Error( 'paypal-api', 'Empty Response' );
-		} elseif ( is_wp_error( $raw_response ) ) {
+		if ( is_wp_error( $raw_response ) ) {
 			return $raw_response;
+		} elseif ( empty( $raw_response['body'] ) ) {
+			return new WP_Error( 'paypal-api', 'Empty Response' );
 		}
 
 		parse_str( $raw_response['body'], $response );
@@ -163,7 +163,7 @@ class WC_Gateway_Paypal_API_Handler {
 /**
  * Here for backwards compatibility.
  *
- * @since WC-3.0.0
+ * @since 3.0.0
  */
 class WC_Gateway_Paypal_Refund extends WC_Gateway_Paypal_API_Handler {
 	/**

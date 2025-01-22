@@ -4,8 +4,8 @@
  *
  * Handles requests to the /orders/<order_id>/notes endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Order Notes controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Order_Notes_V2_Controller
  */
 class WC_REST_Order_Notes_Controller extends WC_REST_Order_Notes_V2_Controller {
@@ -35,7 +35,7 @@ class WC_REST_Order_Notes_Controller extends WC_REST_Order_Notes_V2_Controller {
 	public function prepare_item_for_response( $note, $request ) {
 		$data = array(
 			'id'               => (int) $note->comment_ID,
-			'author'           => __( 'Classic Commerce', 'classic-commerce' ) === $note->comment_author ? 'system' : $note->comment_author,
+			'author'           => __( 'woocommerce', 'classic-commerce' ) === $note->comment_author ? 'system' : $note->comment_author,
 			'date_created'     => wc_rest_prepare_date_response( $note->comment_date ),
 			'date_created_gmt' => wc_rest_prepare_date_response( $note->comment_date_gmt ),
 			'note'             => $note->comment_content,

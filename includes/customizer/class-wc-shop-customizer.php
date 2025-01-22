@@ -99,7 +99,7 @@ class WC_Shop_Customizer {
 		$max_notice = __( 'The maximum allowed setting is %d', 'classic-commerce' );
 		?>
 		<script type="text/javascript">
-			jQuery( document ).ready( function( $ ) {
+			jQuery( function( $ ) {
 				$( document.body ).on( 'change', '.woocommerce-cropping-control input[type="radio"]', function() {
 					var $wrapper = $( this ).closest( '.woocommerce-cropping-control' ),
 						value    = $wrapper.find( 'input:checked' ).val();
@@ -114,7 +114,7 @@ class WC_Shop_Customizer {
 				} );
 
 				wp.customize.bind( 'ready', function() { // Ready?
-					$( '.woocommerce-cropping-control' ).find( 'input:checked' ).change();
+					$( '.woocommerce-cropping-control' ).find( 'input:checked' ).trigger( 'change' );
 				} );
 
 				wp.customize( 'woocommerce_demo_store', function( setting ) {
@@ -223,7 +223,7 @@ class WC_Shop_Customizer {
 								'max_rows_error',
 								{
 									type   : 'error',
-									message: '<?php echo esc_js( sprintf( $min_notice, $max_rows ) ); ?>'
+									message: '<?php echo esc_js( sprintf( $max_notice, $max_rows ) ); ?>'
 								}
 							) );
 						} else {
@@ -513,15 +513,12 @@ class WC_Shop_Customizer {
 	 * @param WP_Customize_Manager $wp_customize Theme Customizer object.
 	 */
 	private function add_product_images_section( $wp_customize ) {
-		if ( apply_filters( 'woocommerce_background_image_regeneration', true ) && ! is_multisite() ) {
+		if ( ! is_multisite() ) {
 			$regen_description = __( 'After publishing your changes, new image sizes will be generated automatically.', 'classic-commerce' );
-		} elseif ( apply_filters( 'woocommerce_background_image_regeneration', true ) && is_multisite() ) {
+		} else {
 			/* translators: 1: tools URL 2: regen thumbs url */
 			$regen_description = sprintf( __( 'After publishing your changes, new image sizes may not be shown until you regenerate thumbnails. You can do this from the <a href="%1$s" target="_blank">tools section in Classic Commerce</a> or by using a plugin such as <a href="%2$s" target="_blank">Regenerate Thumbnails</a>.', 'classic-commerce' ), admin_url( 'admin.php?page=wc-status&tab=tools' ), 'https://en-gb.wordpress.org/plugins/regenerate-thumbnails/' );
-		} else {
-			/* translators: %s: regen thumbs url */
-			$regen_description = sprintf( __( 'After publishing your changes, new image sizes may not be shown until you <a href="%s" target="_blank">Regenerate Thumbnails</a>.', 'classic-commerce' ), 'https://en-gb.wordpress.org/plugins/regenerate-thumbnails/' );
-		}
+		} 
 
 		$wp_customize->add_section(
 			'woocommerce_product_images',
@@ -750,10 +747,16 @@ class WC_Shop_Customizer {
 			)
 		);
 
-		$choose_pages = array(
-			'wp_page_for_privacy_policy' => __( 'Privacy policy', 'classic-commerce' ),
-			'woocommerce_terms_page_id'  => __( 'Terms and conditions', 'classic-commerce' ),
-		);
+		if ( current_user_can( 'manage_privacy_options' ) ) {
+			$choose_pages = array(
+				'wp_page_for_privacy_policy' => __( 'Privacy policy', 'classic-commerce' ),
+				'woocommerce_terms_page_id'  => __( 'Terms and conditions', 'classic-commerce' ),
+			);
+		} else {
+			$choose_pages = array(
+				'woocommerce_terms_page_id'  => __( 'Terms and conditions', 'classic-commerce' ),
+			);
+		}
 		$pages        = get_pages( array(
 			'post_type'   => 'page',
 			'post_status' => 'publish,private,draft',
@@ -798,7 +801,7 @@ class WC_Shop_Customizer {
 				'description'     => __( 'Optionally add some text about your store privacy policy to show during checkout.', 'classic-commerce' ),
 				'section'         => 'woocommerce_checkout',
 				'settings'        => 'woocommerce_checkout_privacy_policy_text',
-				'active_callback' => 'wc_privacy_policy_page_id',
+				'active_callback' => array( $this, 'has_privacy_policy_page_id' ),
 				'type'            => 'textarea',
 			)
 		);
@@ -810,7 +813,7 @@ class WC_Shop_Customizer {
 				'description'     => __( 'Optionally add some text for the terms checkbox that customers must accept.', 'classic-commerce' ),
 				'section'         => 'woocommerce_checkout',
 				'settings'        => 'woocommerce_checkout_terms_and_conditions_checkbox_text',
-				'active_callback' => 'wc_terms_and_conditions_page_id',
+				'active_callback' => array( $this, 'has_terms_and_conditions_page_id' ),
 				'type'            => 'text',
 			)
 		);
@@ -842,6 +845,24 @@ class WC_Shop_Customizer {
 	public function sanitize_checkout_field_display( $value ) {
 		$options = array( 'hidden', 'optional', 'required' );
 		return in_array( $value, $options, true ) ? $value : '';
+	}
+
+    /**
+	 * Whether or not a page has been chose for the privacy policy.
+	 *
+	 * @return bool
+	 */
+	public function has_privacy_policy_page_id() {
+		return wc_privacy_policy_page_id() > 0;
+	}
+
+	/**
+	 * Whether or not a page has been chose for the terms and conditions.
+	 *
+	 * @return bool
+	 */
+	public function has_terms_and_conditions_page_id() {
+		return wc_terms_and_conditions_page_id() > 0;
 	}
 }
 

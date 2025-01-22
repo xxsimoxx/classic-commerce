@@ -4,8 +4,8 @@
  *
  * Handles requests to the /products endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,10 +13,19 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Products controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Products_V2_Controller
  */
 class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
+
+    /**
+	 * A string to inject into a query to do a partial match SKU search.
+	 *
+	 * See prepare_objects_query()
+	 *
+	 * @var string
+	 */
+	private $search_sku_in_product_lookup_table = '';
 
 	/**
 	 * Endpoint namespace.
@@ -24,6 +33,64 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 	 * @var string
 	 */
 	protected $namespace = 'wc/v3';
+
+    /**
+	 * Register the routes for products.
+	 */
+	public function register_routes() {
+		parent::register_routes();
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/(?P<id>[\d]+)/duplicate',
+			array(
+				'args'   => array(
+					'id' => array(
+						'description' => __( 'Unique identifier for the resource.', 'classic-commerce' ),
+						'type'        => 'integer',
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'duplicate_product' ),
+					'permission_callback' => array( $this, 'create_item_permissions_check' ),
+					'args'                => $this->get_endpoint_args_for_item_schema( WP_REST_Server::CREATABLE ),
+				),
+				'schema' => array( $this, 'get_public_item_schema' ),
+			)
+		);
+	}
+
+	/**
+	 * Duplicate a product and returns the duplicated product.
+	 * The product status is set to "draft" and the name includes a "(copy)" at the end by default.
+	 *
+	 * @param WP_REST_Request $request Request data.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function duplicate_product( $request ) {
+		$product_id = $request->get_param( 'id' );
+		$product    = wc_get_product( $product_id );
+
+		if ( ! $product ) {
+			return new WP_Error( 'woocommerce_rest_product_invalid_id', __( 'Invalid product ID.', 'classic-commerce' ), array( 'status' => 404 ) );
+		}
+
+		if ( 'simple' !== $product->get_type() ) {
+			$request['type'] = $product->get_type();
+        }
+
+		// Creating product object from request data in preparation for copying.
+		$updated_product    = $this->prepare_object_for_database( $request );
+		$duplicated_product = ( new WC_Admin_Duplicate_Product() )->product_duplicate( $updated_product );
+
+        if ( is_wp_error( $duplicated_product ) ) {
+			return new WP_Error( 'woocommerce_rest_product_duplicate_error', $duplicated_product->get_error_message(), array( 'status' => 400 ) );
+		}
+
+		$response_data = $duplicated_product->get_data();
+
+		return new WP_REST_Response( $response_data, 200 );
+	}
 
 	/**
 	 * Get the images for a product or product variation.
@@ -71,7 +138,7 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 	}
 
 	/**
-	 * Make extra product orderby features supported by Classic Commerce available to the WC API.
+	 * Make extra product orderby features supported by WooCommerce available to the WC API.
 	 * This includes 'price', 'popularity', and 'rating'.
 	 *
 	 * @param WP_REST_Request $request Request data.
@@ -144,27 +211,39 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 			);
 		}
 
-		// Filter by sku.
-		if ( ! empty( $request['sku'] ) ) {
-			$skus = explode( ',', $request['sku'] );
-			// Include the current string as a SKU too.
-			if ( 1 < count( $skus ) ) {
-				$skus[] = $request['sku'];
+		if ( wc_product_sku_enabled() ) {
+			// Do a partial match for a sku. Supercedes sku parameter that does exact matching.
+			if ( ! empty( $request['search_sku'] ) ) {
+				// Store this for use in the query clause filters.
+				$this->search_sku_in_product_lookup_table = $request['search_sku'];
+
+				unset( $request['sku'] );
 			}
 
-			$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
-				$args, array(
-					'key'     => '_sku',
-					'value'   => $skus,
-					'compare' => 'IN',
-				)
-			);
+			// Filter by sku.
+			if ( ! empty( $request['sku'] ) ) {
+				$skus = explode( ',', $request['sku'] );
+				// Include the current string as a SKU too.
+				if ( 1 < count( $skus ) ) {
+					$skus[] = $request['sku'];
+				}
+
+				$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
+					$args,
+					array(
+						'key'     => '_sku',
+						'value'   => $skus,
+						'compare' => 'IN',
+					)
+				);
+			}
 		}
 
 		// Filter by tax class.
 		if ( ! empty( $request['tax_class'] ) ) {
 			$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
-				$args, array(
+				$args,
+				array(
 					'key'   => '_tax_class',
 					'value' => 'standard' !== $request['tax_class'] ? $request['tax_class'] : '',
 				)
@@ -179,7 +258,8 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 		// Filter product by stock_status.
 		if ( ! empty( $request['stock_status'] ) ) {
 			$args['meta_query'] = $this->add_meta_query( // WPCS: slow query ok.
-				$args, array(
+				$args,
+				array(
 					'key'   => '_stock_status',
 					'value' => $request['stock_status'],
 				)
@@ -198,16 +278,13 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 		}
 
 		// Force the post_type argument, since it's not a user input variable.
-		if ( ! empty( $request['sku'] ) ) {
+		if ( ! empty( $request['sku'] ) || ! empty( $request['search_sku'] )  ) {
 			$args['post_type'] = array( 'product', 'product_variation' );
 		} else {
 			$args['post_type'] = $this->post_type;
 		}
 
-		$orderby = $request->get_param( 'orderby' );
-		$order   = $request->get_param( 'order' );
-
-		$ordering_args   = WC()->query->get_catalog_ordering_args( $orderby, $order );
+		$ordering_args   = WC()->query->get_catalog_ordering_args( $args['orderby'], $args['order'] );
 		$args['orderby'] = $ordering_args['orderby'];
 		$args['order']   = $ordering_args['order'];
 		if ( $ordering_args['meta_key'] ) {
@@ -215,6 +292,61 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 		}
 
 		return $args;
+	}
+
+    /**
+	 * Get objects.
+	 *
+	 * @param array $query_args Query args.
+	 * @return array
+	 */
+	protected function get_objects( $query_args ) {
+		// Add filters for search criteria in product postmeta via the lookup table.
+		if ( ! empty( $this->search_sku_in_product_lookup_table ) ) {
+			add_filter( 'posts_join', array( $this, 'add_search_criteria_to_wp_query_join' ) );
+			add_filter( 'posts_where', array( $this, 'add_search_criteria_to_wp_query_where' ) );
+		}
+
+		$result = parent::get_objects( $query_args );
+
+		// Remove filters for search criteria in product postmeta via the lookup table.
+		if ( ! empty( $this->search_sku_in_product_lookup_table ) ) {
+			remove_filter( 'posts_join', array( $this, 'add_search_criteria_to_wp_query_join' ) );
+			remove_filter( 'posts_where', array( $this, 'add_search_criteria_to_wp_query_where' ) );
+
+			$this->search_sku_in_product_lookup_table = '';
+		}
+		return $result;
+	}
+
+	/**
+	 * Join `wc_product_meta_lookup` table when SKU search query is present.
+	 *
+	 * @param string $join Join clause used to search posts.
+	 * @return string
+	 */
+	public function add_search_criteria_to_wp_query_join( $join ) {
+		global $wpdb;
+		if ( ! empty( $this->search_sku_in_product_lookup_table ) && ! strstr( $join, 'wc_product_meta_lookup' ) ) {
+			$join .= " LEFT JOIN $wpdb->wc_product_meta_lookup wc_product_meta_lookup
+						ON $wpdb->posts.ID = wc_product_meta_lookup.product_id ";
+		}
+		return $join;
+	}
+
+	/**
+	 * Add a where clause for matching the SKU field.
+	 *
+	 * @param string $where Where clause used to search posts.
+	 * @return string
+	 */
+	public function add_search_criteria_to_wp_query_where( $where ) {
+		global $wpdb;
+		if ( ! empty( $this->search_sku_in_product_lookup_table ) ) {
+			$like_search = '%' . $wpdb->esc_like( $this->search_sku_in_product_lookup_table ) . '%';
+			$where .= ' AND ' . $wpdb->prepare( '(wc_product_meta_lookup.sku LIKE %s)', $like_search );
+		}
+		return $where;
 	}
 
 	/**
@@ -226,7 +358,9 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 	 * @return WC_Product
 	 */
 	protected function set_product_images( $product, $images ) {
-		if ( is_array( $images ) ) {
+		$images = is_array( $images ) ? array_filter( $images ) : array();
+
+		if ( ! empty( $images ) ) {
 			$gallery = array();
 
 			foreach ( $images as $index => $image ) {
@@ -255,6 +389,7 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 
 				if ( 0 === $index ) {
 					$product->set_image_id( $attachment_id );
+                    wc_product_attach_featured_image( $attachment_id, $product );
 				} else {
 					$gallery[] = $attachment_id;
 				}
@@ -311,7 +446,9 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 
 		if ( 'variation' === $product->get_type() ) {
 			return new WP_Error(
-				"woocommerce_rest_invalid_{$this->post_type}_id", __( 'To manipulate product variations you should use the /products/&lt;product_id&gt;/variations/&lt;id&gt; endpoint.', 'classic-commerce' ), array(
+				"woocommerce_rest_invalid_{$this->post_type}_id",
+				__( 'To manipulate product variations you should use the /products/&lt;product_id&gt;/variations/&lt;id&gt; endpoint.', 'classic-commerce' ),
+				array(
 					'status' => 404,
 				)
 			);
@@ -544,11 +681,22 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 					$stock_quantity += wc_stock_amount( $request['inventory_delta'] );
 					$product->set_stock_quantity( wc_stock_amount( $stock_quantity ) );
 				}
+
+				// Low stock amount.
+				// isset() returns false for value null, thus we need to check whether the value has been sent by the request.
+				if ( array_key_exists( 'low_stock_amount', $request->get_params() ) ) {
+					if ( null === $request['low_stock_amount'] ) {
+						$product->set_low_stock_amount( '' );
+					} else {
+						$product->set_low_stock_amount( wc_stock_amount( $request['low_stock_amount'] ) );
+					}
+				}
 			} else {
 				// Don't manage stock.
 				$product->set_manage_stock( 'no' );
 				$product->set_stock_quantity( '' );
 				$product->set_stock_status( $stock_status );
+				$product->set_low_stock_amount( '' );
 			}
 		} elseif ( ! $product->is_type( 'variable' ) ) {
 			$product->set_stock_status( $stock_status );
@@ -593,7 +741,34 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 
 		// Product tags.
 		if ( isset( $request['tags'] ) && is_array( $request['tags'] ) ) {
-			$product = $this->save_taxonomy_terms( $product, $request['tags'], 'tag' );
+			$new_tags = array();
+
+			foreach ( $request['tags'] as $tag ) {
+				if ( ! isset( $tag['name'] ) ) {
+					$new_tags[] = $tag;
+					continue;
+				}
+
+				if ( ! term_exists( $tag['name'], 'product_tag' ) ) {
+					// Create the tag if it doesn't exist.
+					$term = wp_insert_term( $tag['name'], 'product_tag' );
+
+					if ( ! is_wp_error( $term ) ) {
+						$new_tags[] = array(
+							'id' => $term['term_id'],
+						);
+
+						continue;
+					}
+				} else {
+					// Tag exists, assume user wants to set the product with this tag.
+					$new_tags[] = array(
+						'id' => get_term_by( 'name', $tag['name'], 'product_tag' )->term_id,
+					);
+				}
+			}
+
+			$product = $this->save_taxonomy_terms( $product, $new_tags, 'tag' );
 		}
 
 		// Downloadable.
@@ -751,7 +926,7 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 					'description' => __( 'Product status (post status).', 'classic-commerce' ),
 					'type'        => 'string',
 					'default'     => 'publish',
-					'enum'        => array_keys( get_post_statuses() ),
+					'enum'        => array_merge( array_keys( get_post_statuses() ), array( 'future' ) ),
 					'context'     => array( 'view', 'edit' ),
 				),
 				'featured'              => array(
@@ -922,7 +1097,7 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 				),
 				'stock_quantity'        => array(
 					'description' => __( 'Stock quantity.', 'classic-commerce' ),
-					'type'        => 'integer',
+					'type'        => has_filter( 'woocommerce_stock_amount', 'intval' ) ? 'integer' : 'number',
 					'context'     => array( 'view', 'edit' ),
 				),
 				'stock_status'          => array(
@@ -950,6 +1125,11 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 					'type'        => 'boolean',
 					'context'     => array( 'view', 'edit' ),
 					'readonly'    => true,
+				),
+				'low_stock_amount'       => array(
+					'description' => __( 'Low Stock amount for the product.', 'classic-commerce' ),
+					'type'        => array( 'integer', 'null' ),
+					'context'     => array( 'view', 'edit' ),
 				),
 				'sold_individually'     => array(
 					'description' => __( 'Allow one item to be bought in a single order.', 'classic-commerce' ),
@@ -1120,7 +1300,7 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 				),
 				'images'                => array(
 					'description' => __( 'List of images.', 'classic-commerce' ),
-					'type'        => 'object',
+					'type'        => 'array',
 					'context'     => array( 'view', 'edit' ),
 					'items'       => array(
 						'type'       => 'object',
@@ -1172,6 +1352,12 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 							),
 						),
 					),
+				),
+                'has_options'     => array(
+					'description' => __( 'Shows if the product needs to be configured before it can be bought.', 'classic-commerce' ),
+					'type'        => 'boolean',
+					'context'     => array( 'view', 'edit' ),
+					'readonly'    => true,
 				),
 				'attributes'            => array(
 					'description' => __( 'List of attributes.', 'classic-commerce' ),
@@ -1315,6 +1501,13 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 			'validate_callback' => 'rest_validate_request_arg',
 		);
 
+        $params['search_sku'] = array(
+			'description'       => __( 'Limit results to those with a SKU that partial matches a string.', 'classic-commerce' ),
+			'type'              => 'string',
+			'sanitize_callback' => 'sanitize_text_field',
+			'validate_callback' => 'rest_validate_request_arg',
+		);
+
 		return $params;
 	}
 
@@ -1322,18 +1515,22 @@ class WC_REST_Products_Controller extends WC_REST_Products_V2_Controller {
 	 * Get product data.
 	 *
 	 * @param WC_Product $product Product instance.
-	 * @param string     $context Request context.
-	 *                            Options: 'view' and 'edit'.
+	 * @param string     $context Request context. Options: 'view' and 'edit'.
+	 *
 	 * @return array
 	 */
 	protected function get_product_data( $product, $context = 'view' ) {
-		$data = parent::get_product_data( $product, $context );
-
-		// Replace in_stock with stock_status.
-		$pos             = array_search( 'in_stock', array_keys( $data ), true );
-		$array_section_1 = array_slice( $data, 0, $pos, true );
-		$array_section_2 = array_slice( $data, $pos + 1, null, true );
-
-		return $array_section_1 + array( 'stock_status' => $product->get_stock_status( $context ) ) + $array_section_2;
+		$data = parent::get_product_data( ...func_get_args() );
+		// Add stock_status if needed.
+		if ( isset( $this->request ) ) {
+			$fields = $this->get_fields_for_response( $this->request );
+			if ( in_array( 'stock_status', $fields ) ) {
+				$data['stock_status'] = $product->get_stock_status( $context );
+			}
+            if ( in_array( 'has_options', $fields ) ) {
+				$data['has_options'] = $product->has_options( $context );
+			}
+		}
+		return $data;
 	}
 }

@@ -4,19 +4,21 @@
  *
  * Handles requests to the /coupons endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
+
+ use ClassicCommerce\Utilities\StringUtil;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * REST API Coupons controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_CRUD_Controller
  */
-class WC_REST_Coupons_V2_Controller extends WC_REST_Legacy_Coupons_Controller {
+class WC_REST_Coupons_V2_Controller extends WC_REST_CRUD_Controller {
 
 	/**
 	 * Endpoint namespace.
@@ -123,7 +125,7 @@ class WC_REST_Coupons_V2_Controller extends WC_REST_Legacy_Coupons_Controller {
 	/**
 	 * Get object.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  int $id Object ID.
 	 * @return WC_Data
 	 */
@@ -134,7 +136,7 @@ class WC_REST_Coupons_V2_Controller extends WC_REST_Legacy_Coupons_Controller {
 	/**
 	 * Get formatted item data.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WC_Data $object WC_Data instance.
 	 * @return array
 	 */
@@ -166,6 +168,7 @@ class WC_REST_Coupons_V2_Controller extends WC_REST_Legacy_Coupons_Controller {
 			'id'                          => $object->get_id(),
 			'code'                        => $data['code'],
 			'amount'                      => $data['amount'],
+            'status'                      => $data['status'],
 			'date_created'                => $data['date_created'],
 			'date_created_gmt'            => $data['date_created_gmt'],
 			'date_modified'               => $data['date_modified'],
@@ -196,7 +199,7 @@ class WC_REST_Coupons_V2_Controller extends WC_REST_Legacy_Coupons_Controller {
 	/**
 	 * Prepare a single coupon output for response.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WC_Data         $object  Object data.
 	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response
@@ -225,15 +228,16 @@ class WC_REST_Coupons_V2_Controller extends WC_REST_Legacy_Coupons_Controller {
 	/**
 	 * Prepare objects query.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @param  WP_REST_Request $request Full details about the request.
 	 * @return array
 	 */
 	protected function prepare_objects_query( $request ) {
 		$args = parent::prepare_objects_query( $request );
 
-		if ( ! empty( $request['code'] ) ) {
-			$id               = wc_get_coupon_id_by_code( $request['code'] );
+		$coupon_code = $request['code'] ?? null;
+		if ( ! StringUtil::is_null_or_whitespace( $coupon_code ) ) {
+			$id               = wc_get_coupon_id_by_code( $coupon_code );
 			$args['post__in'] = array( $id );
 		}
 
@@ -267,7 +271,7 @@ class WC_REST_Coupons_V2_Controller extends WC_REST_Legacy_Coupons_Controller {
 		$data_keys = array_keys( array_filter( $schema['properties'], array( $this, 'filter_writable_props' ) ) );
 
 		// Validate required POST fields.
-		if ( $creating && empty( $request['code'] ) ) {
+		if ( $creating && StringUtil::is_null_or_whitespace( $request['code'] ?? null ) ) {
 			return new WP_Error( 'woocommerce_rest_empty_coupon_code', sprintf( __( 'The coupon code cannot be empty.', 'classic-commerce' ), 'code' ), array( 'status' => 400 ) );
 		}
 
@@ -347,6 +351,11 @@ class WC_REST_Coupons_V2_Controller extends WC_REST_Legacy_Coupons_Controller {
 					'type'        => 'string',
 					'context'     => array( 'view', 'edit' ),
 				),
+                'status' => array(
+					'description' => __( 'The status of the coupon. Should always be draft, published, or pending review', 'classic-commerce' ),
+					'type'        => 'string',
+					'context'     => array( 'view', 'edit' ),
+				),
 				'date_created'                => array(
 					'description' => __( "The date the coupon was created, in the site's timezone.", 'classic-commerce' ),
 					'type'        => 'date-time',
@@ -385,12 +394,12 @@ class WC_REST_Coupons_V2_Controller extends WC_REST_Legacy_Coupons_Controller {
 				),
 				'date_expires'                => array(
 					'description' => __( "The date the coupon expires, in the site's timezone.", 'classic-commerce' ),
-					'type'        => 'string',
+					'type'        => 'date-time',
 					'context'     => array( 'view', 'edit' ),
 				),
 				'date_expires_gmt'            => array(
 					'description' => __( 'The date the coupon expires, as GMT.', 'classic-commerce' ),
-					'type'        => 'string',
+					'type'        => 'date-time',
 					'context'     => array( 'view', 'edit' ),
 				),
 				'usage_count'                 => array(

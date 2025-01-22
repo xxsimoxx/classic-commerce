@@ -47,7 +47,7 @@ class WC_Meta_Data implements JsonSerializable {
 	 *
 	 * @return object|array
 	 */
-	public function jsonSerialize() {
+	public function jsonSerialize() : mixed {
 		return $this->get_data();
 	}
 

@@ -2,7 +2,7 @@
 /**
  * Shipping classes admin
  *
- * @package ClassicCommerce/Admin/Shipping
+ * @package ClassicCommerce\Admin\Shipping
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

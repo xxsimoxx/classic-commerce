@@ -31,16 +31,20 @@ class WC_Shortcode_Cart {
 			$address['postcode'] = isset( $_POST['calc_shipping_postcode'] ) ? wc_clean( wp_unslash( $_POST['calc_shipping_postcode'] ) ) : ''; // WPCS: input var ok, CSRF ok, sanitization ok.
 			$address['city']     = isset( $_POST['calc_shipping_city'] ) ? wc_clean( wp_unslash( $_POST['calc_shipping_city'] ) ) : ''; // WPCS: input var ok, CSRF ok, sanitization ok.
 
+            if ( $address['postcode'] ) {
+				$address['postcode'] = wc_format_postcode( $address['postcode'], $address['country'] );
+			}
+
 			$address = apply_filters( 'woocommerce_cart_calculate_shipping_address', $address );
 
 			if ( $address['postcode'] && ! WC_Validation::is_postcode( $address['postcode'], $address['country'] ) ) {
 				throw new Exception( __( 'Please enter a valid postcode / ZIP.', 'classic-commerce' ) );
-			} elseif ( $address['postcode'] ) {
-				$address['postcode'] = wc_format_postcode( $address['postcode'], $address['country'] );
 			}
 
 			if ( $address['country'] ) {
-				WC()->customer->set_location( $address['country'], $address['state'], $address['postcode'], $address['city'] );
+				if ( ! WC()->customer->get_billing_first_name() ) {
+					WC()->customer->set_billing_location( $address['country'], $address['state'], $address['postcode'], $address['city'] );
+				}
 				WC()->customer->set_shipping_location( $address['country'], $address['state'], $address['postcode'], $address['city'] );
 			} else {
 				WC()->customer->set_billing_address_to_base();
@@ -67,6 +71,10 @@ class WC_Shortcode_Cart {
 	 * @param array $atts Shortcode attributes.
 	 */
 	public static function output( $atts ) {
+        if ( ! apply_filters( 'woocommerce_output_cart_shortcode_content', true ) ) {
+			return;
+		}
+
 		// Constants.
 		wc_maybe_define_constant( 'WOOCOMMERCE_CART', true );
 

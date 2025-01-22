@@ -4,8 +4,8 @@
  *
  * Handles requests to the /webhooks endpoint.
  *
- * @package ClassicCommerce/API
- * @since   WC-2.6.0
+ * @package ClassicCommerce\RestApi
+ * @since   2.6.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * REST API Webhooks controller class.
  *
- * @package ClassicCommerce/API
+ * @package ClassicCommerce\RestApi
  * @extends WC_REST_Webhooks_V1_Controller
  */
 class WC_REST_Webhooks_V2_Controller extends WC_REST_Webhooks_V1_Controller {
@@ -36,7 +36,7 @@ class WC_REST_Webhooks_V2_Controller extends WC_REST_Webhooks_V1_Controller {
 		$webhook = wc_get_webhook( $id );
 
 		if ( empty( $webhook ) || is_null( $webhook ) ) {
-			return new WP_Error( "woocommerce_rest_{$this->post_type}_invalid_id", __( 'ID is invalid.', 'classic-commerce' ), array( 'status' => 400 ) );
+			return new WP_Error( "woocommerce_rest_{$this->post_type}_invalid_id", __( 'ID is invalid.', 'classic-commerce' ), array( 'status' => 404 ) );
 		}
 
 		$data = array(
@@ -76,7 +76,7 @@ class WC_REST_Webhooks_V2_Controller extends WC_REST_Webhooks_V1_Controller {
 	/**
 	 * Get the default REST API version.
 	 *
-	 * @since  WC-3.0.0
+	 * @since  3.0.0
 	 * @return string
 	 */
 	protected function get_default_api_version() {
@@ -109,11 +109,8 @@ class WC_REST_Webhooks_V2_Controller extends WC_REST_Webhooks_V1_Controller {
 					'description' => __( 'Webhook status.', 'classic-commerce' ),
 					'type'        => 'string',
 					'default'     => 'active',
-					'enum'        => array( 'active', 'paused', 'disabled' ),
+					'enum'        => array_keys( wc_get_webhook_statuses() ),
 					'context'     => array( 'view', 'edit' ),
-					'arg_options' => array(
-						'sanitize_callback' => 'wc_is_webhook_valid_topic',
-					),
 				),
 				'topic'             => array(
 					'description' => __( 'Webhook topic.', 'classic-commerce' ),
@@ -133,7 +130,7 @@ class WC_REST_Webhooks_V2_Controller extends WC_REST_Webhooks_V1_Controller {
 					'readonly'    => true,
 				),
 				'hooks'             => array(
-					'description' => __( 'Classic Commerce action names associated with the webhook.', 'classic-commerce' ),
+					'description' => __( 'WooCommerce action names associated with the webhook.', 'classic-commerce' ),
 					'type'        => 'array',
 					'context'     => array( 'view', 'edit' ),
 					'readonly'    => true,

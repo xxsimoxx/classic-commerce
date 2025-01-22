@@ -119,9 +119,10 @@ class WC_Widget_Product_Categories extends WC_Widget {
 		$list_args['depth']      = $max_depth;
 
 		if ( 'order' === $orderby ) {
-			$list_args['menu_order'] = 'asc';
-		} else {
-			$list_args['orderby'] = 'title';
+			$list_args['orderby']      = 'meta_value_num';
+			$dropdown_args['orderby']  = 'meta_value_num';
+			$list_args['meta_key']     = 'order';
+			$dropdown_args['meta_key'] = 'order';
 		}
 
 		$this->current_cat   = false;
@@ -133,8 +134,11 @@ class WC_Widget_Product_Categories extends WC_Widget {
 
 		} elseif ( is_singular( 'product' ) ) {
 			$terms = wc_get_product_terms(
-				$post->ID, 'product_cat', apply_filters(
-					'woocommerce_product_categories_widget_product_terms_args', array(
+				$post->ID,
+				'product_cat',
+				apply_filters(
+					'woocommerce_product_categories_widget_product_terms_args',
+					array(
 						'orderby' => 'parent',
 						'order'   => 'DESC',
 					)
@@ -177,7 +181,8 @@ class WC_Widget_Product_Categories extends WC_Widget {
 				if ( $this->cat_ancestors ) {
 					foreach ( $this->cat_ancestors as $ancestor ) {
 						$include = array_merge(
-							$include, get_terms(
+							$include,
+                            get_terms(
 								'product_cat',
 								array(
 									'fields'       => 'ids',
@@ -222,8 +227,10 @@ class WC_Widget_Product_Categories extends WC_Widget {
 		if ( $dropdown ) {
 			wc_product_dropdown_categories(
 				apply_filters(
-					'woocommerce_product_categories_widget_dropdown_args', wp_parse_args(
-						$dropdown_args, array(
+                    'woocommerce_product_categories_widget_dropdown_args',
+					wp_parse_args(
+						$dropdown_args,
+						array(
 							'show_count'         => $count,
 							'hierarchical'       => $hierarchical,
 							'show_uncategorized' => 0,
@@ -239,7 +246,7 @@ class WC_Widget_Product_Categories extends WC_Widget {
 
 			wc_enqueue_js(
 				"
-				jQuery( '.dropdown_product_cat' ).change( function() {
+				jQuery( '.dropdown_product_cat' ).on( 'change', function() {
 					if ( jQuery(this).val() != '' ) {
 						var this_page = '';
 						var home_url  = '" . esc_js( home_url( '/' ) ) . "';

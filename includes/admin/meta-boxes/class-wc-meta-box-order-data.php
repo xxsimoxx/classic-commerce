@@ -38,7 +38,14 @@ class WC_Meta_Box_Order_Data {
 	 */
 	public static function init_address_fields() {
 
-		self::$billing_fields = apply_filters(
+		/**
+		 * Provides an opportunity to modify the list of order billing fields displayed on the admin.
+		 *
+		 * @since 1.4.0
+		 *
+		 * @param array Billing fields.
+		 */
+        self::$billing_fields = apply_filters(
 			'woocommerce_admin_billing_fields', array(
 				'first_name' => array(
 					'label' => __( 'First name', 'classic-commerce' ),
@@ -69,11 +76,11 @@ class WC_Meta_Box_Order_Data {
 					'show'  => false,
 				),
 				'country'    => array(
-					'label'   => __( 'Country', 'classic-commerce' ),
+					'label'   => __( 'Country / Region', 'classic-commerce' ),
 					'show'    => false,
 					'class'   => 'js_field-country select short',
 					'type'    => 'select',
-					'options' => array( '' => __( 'Select a country&hellip;', 'classic-commerce' ) ) + WC()->countries->get_allowed_countries(),
+					'options' => array( '' => __( 'Select a country / region&hellip;', 'classic-commerce' ) ) + WC()->countries->get_allowed_countries(),
 				),
 				'state'      => array(
 					'label' => __( 'State / County', 'classic-commerce' ),
@@ -89,7 +96,14 @@ class WC_Meta_Box_Order_Data {
 			)
 		);
 
-		self::$shipping_fields = apply_filters(
+		/**
+		 * Provides an opportunity to modify the list of order shipping fields displayed on the admin.
+		 *
+		 * @since 1.4.0
+		 *
+		 * @param array Shipping fields.
+		 */
+        self::$shipping_fields = apply_filters(
 			'woocommerce_admin_shipping_fields', array(
 				'first_name' => array(
 					'label' => __( 'First name', 'classic-commerce' ),
@@ -120,16 +134,19 @@ class WC_Meta_Box_Order_Data {
 					'show'  => false,
 				),
 				'country'    => array(
-					'label'   => __( 'Country', 'classic-commerce' ),
+					'label'   => __( 'Country / Region', 'classic-commerce' ),
 					'show'    => false,
 					'type'    => 'select',
 					'class'   => 'js_field-country select short',
-					'options' => array( '' => __( 'Select a country&hellip;', 'classic-commerce' ) ) + WC()->countries->get_shipping_countries(),
+					'options' => array( '' => __( 'Select a country / region&hellip;', 'classic-commerce' ) ) + WC()->countries->get_shipping_countries(),
 				),
 				'state'      => array(
 					'label' => __( 'State / County', 'classic-commerce' ),
 					'class' => 'js_field-state select short',
 					'show'  => false,
+				),
+                'phone'      => array(
+					'label' => __( 'Phone', 'classic-commerce' ),
 				),
 			)
 		);
@@ -225,17 +242,35 @@ class WC_Meta_Box_Order_Data {
 
 					?>
 				</p>
+                <?php
+					/**
+					 * Hook allowing extenders to render custom content
+					 * within the Order details box.
+					 *
+					 * This allows urgent notices or other important
+					 * order-related info to be displayed upfront in
+					 * the order page. Example: display a notice if
+					 * the order is disputed.
+					 *
+					 * @param $order WC_Order The order object being displayed.
+					 * @since 7.9.0
+					 */
+					do_action( 'woocommerce_admin_order_data_after_payment_info', $order );
+				?>
 				<div class="order_data_column_container">
 					<div class="order_data_column">
 						<h3><?php esc_html_e( 'General', 'classic-commerce' ); ?></h3>
 
 						<p class="form-field form-field-wide">
-							<label for="order_date"><?php _e( 'Date created:', 'classic-commerce' ); ?></label>
-							<input type="text" class="date-picker" name="order_date" maxlength="10" value="<?php echo esc_attr( date_i18n( 'Y-m-d', strtotime( $post->post_date ) ) ); ?>" pattern="<?php echo esc_attr( apply_filters( 'woocommerce_date_input_html_pattern', '[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])' ) ); ?>" />@
+							<?php
+							$order_date_created_localised = ! is_null( $order->get_date_created() ) ? $order->get_date_created()->getOffsetTimestamp() : '';
+							?>
+							<label for="order_date"><?php esc_html_e( 'Date created:', 'classic-commerce' ); ?></label>
+							<input type="text" class="date-picker" name="order_date" maxlength="10" value="<?php echo esc_attr( date_i18n( 'Y-m-d', $order_date_created_localised ) ); ?>" pattern="<?php echo esc_attr( apply_filters( 'woocommerce_date_input_html_pattern', '[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|1[0-9]|2[0-9]|3[01])' ) ); // phpcs:ignore WooCommerce.Commenting.CommentHooks.MissingHookComment ?>" />@
 							&lrm;
-							<input type="number" class="hour" placeholder="<?php esc_attr_e( 'h', 'classic-commerce' ); ?>" name="order_date_hour" min="0" max="23" step="1" value="<?php echo esc_attr( date_i18n( 'H', strtotime( $post->post_date ) ) ); ?>" pattern="([01]?[0-9]{1}|2[0-3]{1})" />:
-							<input type="number" class="minute" placeholder="<?php esc_attr_e( 'm', 'classic-commerce' ); ?>" name="order_date_minute" min="0" max="59" step="1" value="<?php echo esc_attr( date_i18n( 'i', strtotime( $post->post_date ) ) ); ?>" pattern="[0-5]{1}[0-9]{1}" />
-							<input type="hidden" name="order_date_second" value="<?php echo esc_attr( date_i18n( 's', strtotime( $post->post_date ) ) ); ?>" />
+                            <input type="number" class="hour" placeholder="<?php esc_attr_e( 'h', 'classic-commerce' ); ?>" name="order_date_hour" min="0" max="23" step="1" value="<?php echo esc_attr( date_i18n( 'H', $order_date_created_localised ) ); ?>" pattern="([01]?[0-9]{1}|2[0-3]{1})" />:
+							<input type="number" class="minute" placeholder="<?php esc_attr_e( 'm', 'classic-commerce' ); ?>" name="order_date_minute" min="0" max="59" step="1" value="<?php echo esc_attr( date_i18n( 'i', $order_date_created_localised ) ); ?>" pattern="[0-5]{1}[0-9]{1}" />
+							<input type="hidden" name="order_date_second" value="<?php echo esc_attr( date_i18n( 's', $order_date_created_localised ) ); ?>" />
 						</p>
 
 						<p class="form-field form-field-wide wc-order-status">
@@ -289,19 +324,32 @@ class WC_Meta_Box_Order_Data {
 							$user_string = '';
 							$user_id     = '';
 							if ( $order->get_user_id() ) {
-								$user_id = absint( $order->get_user_id() );
-								$user    = get_user_by( 'id', $user_id );
+								$user_id  = absint( $order->get_user_id() );
+								$customer = new WC_Customer( $user_id );
 								/* translators: 1: user display name 2: user ID 3: user email */
 								$user_string = sprintf(
+                                    /* translators: 1: customer name, 2 customer id, 3: customer email */
 									esc_html__( '%1$s (#%2$s &ndash; %3$s)', 'classic-commerce' ),
-									$user->display_name,
-									absint( $user->ID ),
-									$user->user_email
+									$customer->get_first_name() . ' ' . $customer->get_last_name(),
+									$customer->get_id(),
+									$customer->get_email()
 								);
 							}
 							?>
 							<select class="wc-customer-search" id="customer_user" name="customer_user" data-placeholder="<?php esc_attr_e( 'Guest', 'classic-commerce' ); ?>" data-allow_clear="true">
-								<option value="<?php echo esc_attr( $user_id ); ?>" selected="selected"><?php echo htmlspecialchars( $user_string ); ?></option>
+								<?php
+								// phpcs:disable WooCommerce.Commenting.CommentHooks.MissingHookComment
+								/**
+								 * Filter to customize the display of the currently selected customer for an order in the order edit page.
+								 * This is the same filter used in the ajax call for customer search in the same metabox.
+								 *
+								 * @since 7.2.0 (this instance of the filter)
+								 *
+								 * @param array @user_info An array containing one item with the name and email of the user currently selected as the customer for the order.
+								 */
+								?>
+								<option value="<?php echo esc_attr( $user_id ); ?>" selected="selected"><?php echo esc_html( htmlspecialchars( wp_kses_post( current( apply_filters( 'woocommerce_json_search_found_customers', array( $user_string ) ) ) ) ) ); ?></option>
+								<?php // phpcs:enable WooCommerce.Commenting.CommentHooks.MissingHookComment ?>
 							</select>
 							<!--/email_off-->
 						</p>
@@ -342,6 +390,8 @@ class WC_Meta_Box_Order_Data {
 
 								if ( 'billing_phone' === $field_name ) {
 									$field_value = wc_make_phone_clickable( $field_value );
+                                } elseif ( 'billing_email' === $field_name ) {
+									$field_value = '<a href="' . esc_url( 'mailto:' . $field_value ) . '">' . $field_value . '</a>';
 								} else {
 									$field_value = make_clickable( esc_html( $field_value ) );
 								}
@@ -402,9 +452,9 @@ class WC_Meta_Box_Order_Data {
 									}
 
 									if ( ! $found_method && ! empty( $payment_method ) ) {
-										echo '<option value="' . esc_attr( $payment_method ) . '" selected="selected">' . __( 'Other', 'classic-commerce' ) . '</option>';
+										echo '<option value="' . esc_attr( $payment_method ) . '" selected="selected">' . esc_html__( 'Other', 'classic-commerce' ) . '</option>';
 									} else {
-										echo '<option value="other">' . __( 'Other', 'classic-commerce' ) . '</option>';
+										echo '<option value="other">' . esc_html__( 'Other', 'classic-commerce' ) . '</option>';
 									}
 									?>
 								</select>
@@ -456,6 +506,10 @@ class WC_Meta_Box_Order_Data {
 										$field_value = $order->get_meta( '_' . $field_name );
 									}
 
+                                    if ( 'shipping_phone' === $field_name ) {
+										$field_value = wc_make_phone_clickable( $field_value );
+									}
+
 									if ( $field_value ) {
 										echo '<p><strong>' . esc_html( $field['label'] ) . ':</strong> ' . wp_kses_post( $field_value ) . '</p>';
 									}
@@ -463,7 +517,7 @@ class WC_Meta_Box_Order_Data {
 							}
 
 							if ( apply_filters( 'woocommerce_enable_order_notes_field', 'yes' == get_option( 'woocommerce_enable_order_comments', 'yes' ) ) && $post->post_excerpt ) {
-								echo '<p class="order_note"><strong>' . __( 'Customer provided note:', 'classic-commerce' ) . '</strong> ' . nl2br( esc_html( $post->post_excerpt ) ) . '</p>';
+								echo '<p class="order_note"><strong>' . __( 'Customer provided note:', 'classic-commerce' ) . '</strong> ' . wp_kses( nl2br( esc_html( $order->get_customer_note() ) ), array() ) . '</p>';
 							}
 							?>
 						</div>
@@ -499,11 +553,18 @@ class WC_Meta_Box_Order_Data {
 								}
 							}
 
-							if ( apply_filters( 'woocommerce_enable_order_notes_field', 'yes' == get_option( 'woocommerce_enable_order_comments', 'yes' ) ) ) :
+							/**
+							 * Allows 3rd parties to alter whether the customer note should be displayed on the admin.
+							 *
+							 * @since 2.1.0
+							 *
+							 * @param bool TRUE if the note should be displayed. FALSE otherwise.
+							 */
+                            if ( apply_filters( 'woocommerce_enable_order_notes_field', 'yes' == get_option( 'woocommerce_enable_order_comments', 'yes' ) ) ) :
 								?>
 								<p class="form-field form-field-wide">
 									<label for="excerpt"><?php _e( 'Customer provided note', 'classic-commerce' ); ?>:</label>
-									<textarea rows="1" cols="40" name="excerpt" tabindex="6" id="excerpt" placeholder="<?php esc_attr_e( 'Customer notes about the order', 'classic-commerce' ); ?>"><?php echo wp_kses_post( $post->post_excerpt ); ?></textarea>
+									<textarea rows="1" cols="40" name="excerpt" tabindex="6" id="excerpt" placeholder="<?php esc_attr_e( 'Customer notes about the order', 'classic-commerce' ); ?>"><?php echo wp_kses( $order->get_customer_note(), array() ); ?></textarea>
 								</p>
 							<?php endif; ?>
 						</div>
@@ -596,6 +657,10 @@ class WC_Meta_Box_Order_Data {
 				$payment_method_title = $methods[ $payment_method ]->get_title();
 			}
 
+            if ( $payment_method == 'other') {
+				$payment_method_title = esc_html__( 'Other', 'classic-commerce' );
+			}
+
 			$props['payment_method']       = $payment_method;
 			$props['payment_method_title'] = $payment_method_title;
 		}
@@ -612,6 +677,11 @@ class WC_Meta_Box_Order_Data {
 		// Set created via prop if new post.
 		if ( isset( $_POST['original_post_status'] ) && $_POST['original_post_status'] === 'auto-draft' ) {
 			$props['created_via'] = 'admin';
+		}
+
+        // Customer note.
+		if ( isset( $_POST['customer_note'] ) ) {
+			$props['customer_note'] = sanitize_textarea_field( wp_unslash( $_POST['customer_note'] ) );
 		}
 
 		// Save order data.

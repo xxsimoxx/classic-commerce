@@ -2,14 +2,12 @@
 /**
  * Classic Commerce Admin Functions
  *
- * @author   WooThemes
- * @category Core
  * @package  ClassicCommerce/Admin/Functions
  * @version  WC-2.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+	exit;
 }
 
 /**
@@ -18,10 +16,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return array
  */
 function wc_get_screen_ids() {
-
-	$wc_screen_id = sanitize_title( __( 'WooCommerce', 'classic-commerce' ) );
+	$wc_screen_id = 'woocommerce';
 	$screen_ids   = array(
 		'toplevel_page_' . $wc_screen_id,
+		$wc_screen_id . '_page_wc-orders',
 		$wc_screen_id . '_page_wc-reports',
 		$wc_screen_id . '_page_wc-shipping',
 		$wc_screen_id . '_page_wc-settings',
@@ -31,6 +29,7 @@ function wc_get_screen_ids() {
 		'product_page_product_attributes',
 		'product_page_product_exporter',
 		'product_page_product_importer',
+		'product_page_product-reviews',
 		'edit-product',
 		'product',
 		'edit-shop_coupon',
@@ -44,44 +43,70 @@ function wc_get_screen_ids() {
 	foreach ( wc_get_order_types() as $type ) {
 		$screen_ids[] = $type;
 		$screen_ids[] = 'edit-' . $type;
+		$screen_ids[] = wc_get_page_screen_id( $type );
 	}
 
-	if ( $attributes = wc_get_attribute_taxonomies() ) {
+	$attributes = wc_get_attribute_taxonomies();
+
+	if ( $attributes ) {
 		foreach ( $attributes as $attribute ) {
 			$screen_ids[] = 'edit-' . wc_attribute_taxonomy_name( $attribute->attribute_name );
 		}
 	}
 
+	/* phpcs:disable Classic Commerce.Commenting.CommentHooks.MissingHookComment */
 	return apply_filters( 'woocommerce_screen_ids', $screen_ids );
+	/* phpcs: enable */
+}
+
+/**
+ * Get page ID for a specific CC resource.
+ *
+ * @param string $for Name of the resource.
+ *
+ * @return string Page ID. Empty string if resource not found.
+ */
+function wc_get_page_screen_id( $for ) {
+	$screen_id = '';
+	$for       = str_replace( '-', '_', $for );
+
+	if ( in_array( $for, wc_get_order_types( 'admin-menu' ), true ) ) {
+		
+		$screen_id = $for;
+	}
+
+	return $screen_id;
 }
 
 /**
  * Create a page and store the ID in an option.
  *
- * @param mixed  $slug Slug for the new page
- * @param string $option Option name to store the page's ID
- * @param string $page_title (default: '') Title for the new page
- * @param string $page_content (default: '') Content for the new page
- * @param int    $post_parent (default: 0) Parent for the new page
- * @return int page ID
+ * @param mixed  $slug Slug for the new page.
+ * @param string $option Option name to store the page's ID.
+ * @param string $page_title (default: '') Title for the new page.
+ * @param string $page_content (default: '') Content for the new page.
+ * @param int    $post_parent (default: 0) Parent for the new page.
+ * @return int page ID.
  */
 function wc_create_page( $slug, $option = '', $page_title = '', $page_content = '', $post_parent = 0 ) {
 	global $wpdb;
 
 	$option_value = get_option( $option );
 
-	if ( $option_value > 0 && ( $page_object = get_post( $option_value ) ) ) {
-		if ( 'page' === $page_object->post_type && ! in_array( $page_object->post_status, array( 'pending', 'trash', 'future', 'auto-draft' ) ) ) {
-			// Valid page is already in place
+	if ( $option_value > 0 ) {
+		$page_object = get_post( $option_value );
+
+		if ( $page_object && 'page' === $page_object->post_type && ! in_array( $page_object->post_status, array( 'pending', 'trash', 'future', 'auto-draft' ), true ) ) {
+			// Valid page is already in place.
 			return $page_object->ID;
 		}
 	}
 
 	if ( strlen( $page_content ) > 0 ) {
-		// Search for an existing page with the specified page content (typically a shortcode)
+		// Search for an existing page with the specified page content (typically a shortcode).
 		$valid_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status NOT IN ( 'pending', 'trash', 'future', 'auto-draft' ) AND post_content LIKE %s LIMIT 1;", "%{$page_content}%" ) );
 	} else {
-		// Search for an existing page with the specified page slug
+		// Search for an existing page with the specified page slug.
 		$valid_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status NOT IN ( 'pending', 'trash', 'future', 'auto-draft' )  AND post_name = %s LIMIT 1;", $slug ) );
 	}
 
@@ -94,12 +119,12 @@ function wc_create_page( $slug, $option = '', $page_title = '', $page_content = 
 		return $valid_page_found;
 	}
 
-	// Search for a matching valid trashed page
+	// Search for a matching valid trashed page.
 	if ( strlen( $page_content ) > 0 ) {
-		// Search for an existing page with the specified page content (typically a shortcode)
+		// Search for an existing page with the specified page content (typically a shortcode).
 		$trashed_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status = 'trash' AND post_content LIKE %s LIMIT 1;", "%{$page_content}%" ) );
 	} else {
-		// Search for an existing page with the specified page slug
+		// Search for an existing page with the specified page slug.
 		$trashed_page_found = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type='page' AND post_status = 'trash' AND post_name = %s LIMIT 1;", $slug ) );
 	}
 
@@ -136,7 +161,7 @@ function wc_create_page( $slug, $option = '', $page_title = '', $page_content = 
  *
  * Loops though the woocommerce options array and outputs each field.
  *
- * @param array $options Opens array to output
+ * @param array $options Opens array to output.
  */
 function woocommerce_admin_fields( $options ) {
 
@@ -150,8 +175,8 @@ function woocommerce_admin_fields( $options ) {
 /**
  * Update all settings which are passed.
  *
- * @param array $options
- * @param array $data
+ * @param array $options Option fields to save.
+ * @param array $data Passed data.
  */
 function woocommerce_update_options( $options, $data = null ) {
 
@@ -165,8 +190,8 @@ function woocommerce_update_options( $options, $data = null ) {
 /**
  * Get a setting from the settings API.
  *
- * @param mixed $option_name
- * @param mixed $default
+ * @param mixed $option_name Option name to save.
+ * @param mixed $default Default value to save.
  * @return string
  */
 function woocommerce_settings_get_option( $option_name, $default = '' ) {
@@ -179,15 +204,90 @@ function woocommerce_settings_get_option( $option_name, $default = '' ) {
 }
 
 /**
+ * Sees if line item stock has already reduced stock, and whether those values need adjusting e.g. after changing item qty.
+ *
+ * @since 3.6.0
+ * @param WC_Order_Item $item Item object.
+ * @param integer       $item_quantity Optional quantity to check against. Read from object if not passed.
+ * @return boolean|array|WP_Error Array of changes or error object when stock is updated (@see wc_update_product_stock). False if nothing changes.
+ */
+function wc_maybe_adjust_line_item_product_stock( $item, $item_quantity = -1 ) {
+	if ( 'line_item' !== $item->get_type() ) {
+		return false;
+	}
+
+    /**
+	 * Prevent adjust line item product stock.
+	 *
+	 * @since 3.7.1
+	 * @param bool $prevent If should prevent.
+	 * @param WC_Order_Item $item Item object.
+	 * @param int           $item_quantity Optional quantity to check against.
+	 */
+	if ( apply_filters( 'woocommerce_prevent_adjust_line_item_product_stock', false, $item, $item_quantity ) ) {
+		return false;
+	}
+
+	$product               = $item->get_product();
+	$item_quantity         = wc_stock_amount( $item_quantity >= 0 ? $item_quantity : $item->get_quantity() );
+	$already_reduced_stock = wc_stock_amount( $item->get_meta( '_reduced_stock', true ) );
+
+	if ( ! $product || ! $product->managing_stock() ) {
+		return false;
+	}
+
+    $order                  = $item->get_order();
+	$refunded_item_quantity = $order->get_qty_refunded_for_item( $item->get_id() );
+	$diff                   = $item_quantity + $refunded_item_quantity - $already_reduced_stock;
+
+    /*
+	 * 0 as $item_quantity usually indicates we're deleting the order item.
+	 * Let's restore back the reduced count.
+	 */
+	if ( 0 === $item_quantity ) {
+		$diff = $already_reduced_stock * -1;
+	}
+
+	if ( $diff < 0 ) {
+		$new_stock = wc_update_product_stock( $product, $diff * -1, 'increase' );
+	} elseif ( $diff > 0 ) {
+		$new_stock = wc_update_product_stock( $product, $diff, 'decrease' );
+	}
+
+	if ( is_wp_error( $new_stock ) ) {
+		return $new_stock;
+	}
+
+	$item->update_meta_data( '_reduced_stock', $item_quantity + $refunded_item_quantity );
+	$item->save();
+
+    if ( $item_quantity > 0 ) {
+		// If stock was reduced, then we need to mark this on parent order object as well so that cancel logic works properly.
+		$order_data_store = WC_Data_Store::load( 'order' );
+		if ( $item->get_order_id() && ! $order_data_store->get_stock_reduced( $item->get_order_id() ) ) {
+			$order_data_store->set_stock_reduced( $item->get_order_id(), true );
+		}
+	}
+
+	return array(
+		'from' => $new_stock + $diff,
+		'to'   => $new_stock,
+	);
+}
+
+/**
  * Save order items. Uses the CRUD.
  *
  * @since WC-2.2
- * @param int   $order_id Order ID
- * @param array $items Order items to save
+ * @param int   $order_id Order ID.
+ * @param array $items Order items to save.
  */
 function wc_save_order_items( $order_id, $items ) {
 	// Allow other plugins to check change in order items before they are saved.
 	do_action( 'woocommerce_before_save_order_items', $order_id, $items );
+
+    $qty_change_order_notes = array();
+    $order                  = wc_get_order( $order_id );
 
 	// Line items and fees.
 	if ( isset( $items['order_item_id'] ) ) {
@@ -201,7 +301,9 @@ function wc_save_order_items( $order_id, $items ) {
 			'line_subtotal'        => null,
 		);
 		foreach ( $items['order_item_id'] as $item_id ) {
-			if ( ! $item = WC_Order_Factory::get_order_item( absint( $item_id ) ) ) {
+			$item = WC_Order_Factory::get_order_item( absint( $item_id ) );
+
+			if ( ! $item ) {
 				continue;
 			}
 
@@ -212,6 +314,10 @@ function wc_save_order_items( $order_id, $items ) {
 			}
 
 			if ( '0' === $item_data['order_item_qty'] ) {
+                $changed_stock = wc_maybe_adjust_line_item_product_stock( $item, 0 );
+				if ( $changed_stock && ! is_wp_error( $changed_stock ) ) {
+					$qty_change_order_notes[] = $item->get_name() . ' &ndash; ' . $changed_stock['from'] . '&rarr;' . $changed_stock['to'];
+				}
 				$item->delete();
 				continue;
 			}
@@ -255,10 +361,17 @@ function wc_save_order_items( $order_id, $items ) {
 			do_action( 'woocommerce_before_save_order_item', $item );
 
 			$item->save();
+
+            if ( in_array( $order->get_status(), array( 'processing', 'completed', 'on-hold' ) ) ) {
+				$changed_stock = wc_maybe_adjust_line_item_product_stock( $item );
+				if ( $changed_stock && ! is_wp_error( $changed_stock ) ) {
+					$qty_change_order_notes[] = $item->get_name() . ' (' . $changed_stock['from'] . '&rarr;' . $changed_stock['to'] . ')';
+				}
+			}
 		}
 	}
 
-	// Shipping Rows
+	// Shipping Rows.
 	if ( isset( $items['shipping_method_id'] ) ) {
 		$data_keys = array(
 			'shipping_method'       => null,
@@ -268,7 +381,9 @@ function wc_save_order_items( $order_id, $items ) {
 		);
 
 		foreach ( $items['shipping_method_id'] as $item_id ) {
-			if ( ! $item = WC_Order_Factory::get_order_item( absint( $item_id ) ) ) {
+			$item = WC_Order_Factory::get_order_item( absint( $item_id ) );
+
+			if ( ! $item ) {
 				continue;
 			}
 
@@ -310,10 +425,16 @@ function wc_save_order_items( $order_id, $items ) {
 	}
 
 	$order = wc_get_order( $order_id );
+
+    if ( ! empty( $qty_change_order_notes ) ) {
+		/* translators: %s item name. */
+		$order->add_order_note( sprintf( __( 'Adjusted stock: %s', 'classic-commerce' ), implode( ', ', $qty_change_order_notes ) ), false, true );
+	}
+
 	$order->update_taxes();
 	$order->calculate_totals( false );
 
-	// Inform other plugins that the items have been saved
+	// Inform other plugins that the items have been saved.
 	do_action( 'woocommerce_saved_order_items', $order_id, $items );
 }
 
@@ -336,4 +457,80 @@ function wc_render_action_buttons( $actions ) {
 	}
 
 	return $actions_html;
+}
+
+/**
+ * Shows a notice if variations are missing prices.
+ *
+ * @since 3.6.0
+ * @param WC_Product $product_object Product object.
+ */
+function wc_render_invalid_variation_notice( $product_object ) {
+	global $wpdb;
+
+    // Give ability for extensions to hide this notice.
+	if ( ! apply_filters( 'woocommerce_show_invalid_variations_notice', true, $product_object ) ) {
+		return;
+	}
+
+	$variation_ids = $product_object ? $product_object->get_children() : array();
+
+	if ( empty( $variation_ids ) ) {
+		return;
+	}
+
+	$variation_count = count( $variation_ids );
+
+	// Check if a variation exists without pricing data.
+	// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
+	$valid_variation_count = $wpdb->get_var(
+		"
+		SELECT count(post_id) FROM {$wpdb->postmeta}
+		WHERE post_id in (" . implode( ',', array_map( 'absint', $variation_ids ) ) . ")
+		AND meta_key='_price'
+		AND meta_value >= 0
+		AND meta_value != ''
+		"
+	);
+	// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+	$invalid_variation_count = $variation_count - $valid_variation_count;
+
+	if ( 0 < $invalid_variation_count ) {
+		?>
+		<div id="message" class="inline notice woocommerce-message woocommerce-notice-invalid-variation">
+			<p>
+			<?php
+			echo wp_kses_post(
+				sprintf(
+					/* Translators: %d variation count. */
+					_n( '%d variation does not have a price.', '%d variations do not have prices.', $invalid_variation_count, 'classic-commerce' ),
+					$invalid_variation_count
+				) . '&nbsp;' .
+				__( 'Variations (and their attributes) that do not have prices will not be shown in your store.', 'classic-commerce' )
+			);
+			?>
+			</p>
+		</div>
+		<?php
+	}
+}
+
+function wc_get_default_product_type_options() {
+	return array(
+		'virtual'      => array(
+			'id'            => '_virtual',
+			'wrapper_class' => 'show_if_simple',
+			'label'         => __( 'Virtual', 'classic-commerce' ),
+			'description'   => __( 'Virtual products are intangible and are not shipped.', 'classic-commerce' ),
+			'default'       => 'no',
+		),
+		'downloadable' => array(
+			'id'            => '_downloadable',
+			'wrapper_class' => 'show_if_simple',
+			'label'         => __( 'Downloadable', 'classic-commerce' ),
+			'description'   => __( 'Downloadable products give access to a file upon purchase.', 'classic-commerce' ),
+			'default'       => 'no',
+		),
+	);
 }

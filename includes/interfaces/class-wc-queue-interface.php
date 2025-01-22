@@ -6,10 +6,6 @@
  * @package ClassicCommerce/Interface
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly.
-}
-
 /**
  * WC Queue Interface
  *
@@ -95,7 +91,7 @@ interface WC_Queue_Interface {
 	public function cancel_all( $hook, $args = array(), $group = '' );
 
 	/**
-	 * Get the date and time for the next scheduled occurence of an action with a given hook
+	 * Get the date and time for the next scheduled occurrence of an action with a given hook
 	 * (an optionally that matches certain args and group), if any.
 	 *
 	 * @param string $hook The hook that the job will trigger.
