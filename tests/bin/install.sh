@@ -6,6 +6,12 @@ if [ $# -lt 3 ]; then
 	exit 1
 fi
 
+GREP='grep'
+if [ "$(uname)" == "Darwin" ]; then
+    GREP='ggrep';
+    echo 'Running on osX';
+fi
+
 DB_NAME=$1
 DB_USER=$2
 DB_PASS=$3
@@ -14,10 +20,10 @@ CP_VERSION=${5-latest}
 SKIP_DB_CREATE=${6-false}
 
 TMPDIR=$(pwd)'/tmp'
-mkdir $TMPDIR
+mkdir -p $TMPDIR
 #TMPDIR=$(echo $TMPDIR | sed -e "s/\/$//")
 CP_TESTS_DIR=${CP_TESTS_DIR-$TMPDIR/classicpress-tests-lib}
-mkdir CP_TESTS_DIR
+mkdir -p CP_TESTS_DIR
 CP_CORE_DIR=${CP_CORE_DIR-$TMPDIR/classicpress}
 
 # Remove trailing slashes
@@ -45,7 +51,7 @@ if [[ "$CP_VERSION" == latest ]]; then
 	download \
 		https://www.classicpress.net/latest.json \
 		"$TMPDIR/cp-latest.json"
-	CP_VERSION="$(ggrep -Po '"version":\s*"[^"]+"' "$TMPDIR/cp-latest.json" | cut -d'"' -f4)"
+	CP_VERSION="$($GREP -Po '"version":\s*"[^"]+"' "$TMPDIR/cp-latest.json" | cut -d'"' -f4)"
 	if [ -z "$CP_VERSION" ]; then
 		echo "ClassicPress version not detected correctly!"
 		cat "$TMPDIR/cp-latest.json"
@@ -167,7 +173,7 @@ install_db() {
 	local EXTRA=""
 
 	if ! [ -z $DB_HOSTNAME ] ; then
-		if [ $(echo $DB_SOCK_OR_PORT | grep -e '^[0-9]\{1,\}$') ]; then
+		if [ $(echo $DB_SOCK_OR_PORT | $GREP -e '^[0-9]\{1,\}$') ]; then
 			EXTRA=" --host=$DB_HOSTNAME --port=$DB_SOCK_OR_PORT --protocol=tcp"
 		elif ! [ -z $DB_SOCK_OR_PORT ] ; then
 			EXTRA=" --socket=$DB_SOCK_OR_PORT"
